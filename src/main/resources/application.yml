@@ -1,0 +1,22 @@
+spring:
+  profiles:
+    active: topics,sender,remote
+
+  rabbitmq:
+    host: 10.5.133.213
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+ats:
+  serv:
+    tag: 10.5.133.212
+
+logging:
+  level:
+    org: ERROR
+
+tutorial:
+  client:
+    duration: 10000
