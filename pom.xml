@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.byd5.ats</groupId>
-	<artifactId>serv39-traindepart</artifactId>
+	<artifactId>serv39-trainruntask</artifactId>
 	<version>0.0.1</version>
 
 	<properties>
