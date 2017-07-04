@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
@@ -77,12 +78,12 @@ public class RunTaskService {
 		cmd.setTrainNum((short) task.getTrainnum());
 		cmd.setDstLineNum((short) 1); // ??? need rungraph supply!
 		
-		List<TrainRunTimetable> timetableList = task.getRungraphTodayTimetable();
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 		TrainRunTimetable first = timetableList.get(0);
-		TrainRunTimetable last = timetableList.get(timetableList.size()-1);
+		//TrainRunTimetable last = timetableList.get(timetableList.size()-1);
 		
-		cmd.setDstStationNum(last.getPlatformId());
-		cmd.setDirectionPlan((short) 0x55); // ??? need rungraph supply!
+		cmd.setDstStationNum(task.getDstStationNum());
+		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
 		
 		cmd.setSkipStationId(0xFFFF);
 		
@@ -110,11 +111,11 @@ public class RunTaskService {
 		FrameATOCommand fCommand = new FrameATOCommand();
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
-		int platformId = event.getThis_station_id();
+		int platformId = event.getStation();
 		//TrainRunTask task = new TrainRunTask();
 		FrameATOStatus fStatus = new FrameATOStatus();
 		
-		Integer carNum = event.getTrain_num();
+		Integer carNum = (int) event.getCarNum();
 		/*if (mapRunTask.containsKey(carNum)) {
 			task = mapRunTask.get(carNum);
 		}
@@ -130,7 +131,7 @@ public class RunTaskService {
 			// TODO
 		}
 
-		List<TrainRunTimetable> timetableList = task.getRungraphTodayTimetable();
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 		TrainRunTimetable last = timetableList.get(timetableList.size()-1);
 		if (platformId == last.getPlatformId()) {
 			// 到达本车次的终点站，根据车次时刻表向VOBC发送折返命令
@@ -204,11 +205,11 @@ public class RunTaskService {
 		FrameATOCommand fCommand = new FrameATOCommand();
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
-		int platformId = event.getThis_station_id();
+		int platformId = event.getStation();
 		//TrainRunTask task = new TrainRunTask();
 		FrameATOStatus fStatus = new FrameATOStatus();
 		
-		Integer carNum = event.getTrain_num();
+		Integer carNum = (int) event.getCarNum();
 		/*if (mapRunTask.containsKey(carNum)) {
 			task = mapRunTask.get(carNum);
 		}
@@ -224,7 +225,7 @@ public class RunTaskService {
 			// TODO
 		}
 
-		List<TrainRunTimetable> timetableList = task.getRungraphTodayTimetable();
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 		TrainRunTimetable last = timetableList.get(timetableList.size()-1);
 /*		if (platformId == last.getPlatformId()) {
 			// 到达本车次的终点站，根据车次时刻表向VOBC发送折返命令
@@ -297,5 +298,38 @@ public class RunTaskService {
 		fCommand.setAtoCommand(cmd);
 		
 		return fCommand;
+	}
+	
+	
+	/**
+	 * 当列车到站时，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向客户端发送站停时间
+	 * @param event
+	 * @return
+	 */
+	public AppDataStationTiming clientTimeStationStop(TrainRunTask task, TrainEventPosition event) {
+
+		int platformId = event.getStation();
+		Integer carNum = (int) event.getCarNum();
+
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
+		TrainRunTimetable last = timetableList.get(timetableList.size()-1);
+
+		TrainRunTimetable currStation = null;
+		TrainRunTimetable nextStation = null;
+		for (int i = 0; i < timetableList.size()-1; i ++) {
+			TrainRunTimetable t = timetableList.get(i);
+			if (t.getPlatformId() == platformId) {
+				currStation = t;
+				nextStation = timetableList.get(i+1);
+			}
+		}
+		int timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+		int timeStationStop = (int) ((nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000); // 站停时间（单位：秒）
+		
+		AppDataStationTiming appDataStationTiming = new AppDataStationTiming();
+		appDataStationTiming.setStation_id(currStation.getNextPlatformId());
+		appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
+		
+		return appDataStationTiming;
 	}
 }

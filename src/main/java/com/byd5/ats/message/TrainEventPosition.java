@@ -3,120 +3,119 @@ package com.byd5.ats.message;
 
 public class TrainEventPosition {
 	
-	private Integer service_num;/* 服务号/表号 */
-	private Integer line_num;/* 线路编号 */
-	private Integer train_line_num;/* 车组所属线路编号 */
-	private Integer train_num;/* 车组号 */
-	private Integer origin_line_num;/* 列车始发站线路编号*/
-	private Integer train_order_num;/* 车次号 */
-	private Integer destin_line_num;/* 目的地线路编号*/
-	private Integer destin_num; /* 目的地号*/
-	private Integer direction_train;// 运行方向|1-下行，2-上行|
-	private Integer park_stab_status;//列车停稳状态
-	private Integer this_station_id;//这一站台id
-	private Integer next_station_id;//下一站台id
-	private Integer  t_head_track_id;//车头所在的逻辑区段_
-	private Integer running_level;//运行等级
-	private Long sec;//秒
-	private Long usec;//微秒
+	public String servTag;
+	public short serviceNum;
+	public short lineNum;					//线路编号（2字节）：全网统一标识
+	public short carLineNum;				//车组所属线路编号（2字节）：全网统一标识
+	public short carNum;					// 车组号（2字节）：
+	public short srcLineNum;				//源线路编号（2字节））：列车始发站线路编号；默认值为0xffff；全网统一标识
+	public short trainNum;					//车次号（2字节）：0000～9999；默认值0000
+	public short dstLineNum;				//目的地线路编号（2字节）：同线路编号；列车为非计划车时，发送默认值0xffff
+	public int dstStationNum;				//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
+	public short directionPlan;				//计划运行方向（1字节）：上行=0x55；下行=0xAA
+	public Integer station;					//目前所在站台id
+	public Integer nextStationId;			//下一停车站台ID（2字节）：定义同“跳停站台ID”，默认值为0xFFFF
+	public short  trainPark;         		// 列车停稳状态  停稳且停准：0x55 未停稳/未停准：0xAA
+	public String trainHeaderAtphycical;   	//车头所在的物理区段
+	private int runningLevel;				//运行等级
+	private long timestamp;					//精确到ms
 	
-	public Integer getService_num() {
-		return service_num;
+	public String getServTag() {
+		return servTag;
 	}
-	public void setService_num(Integer service_num) {
-		this.service_num = service_num;
+	public void setServTag(String servTag) {
+		this.servTag = servTag;
 	}
-	public Integer getLine_num() {
-		return line_num;
+	public short getServiceNum() {
+		return serviceNum;
 	}
-	public void setLine_num(Integer line_num) {
-		this.line_num = line_num;
+	public void setServiceNum(short serviceNum) {
+		this.serviceNum = serviceNum;
 	}
-	public Integer getTrain_line_num() {
-		return train_line_num;
+	public short getLineNum() {
+		return lineNum;
 	}
-	public void setTrain_line_num(Integer train_line_num) {
-		this.train_line_num = train_line_num;
+	public void setLineNum(short lineNum) {
+		this.lineNum = lineNum;
 	}
-	public Integer getTrain_num() {
-		return train_num;
+	public short getCarLineNum() {
+		return carLineNum;
 	}
-	public void setTrain_num(Integer train_num) {
-		this.train_num = train_num;
+	public void setCarLineNum(short carLineNum) {
+		this.carLineNum = carLineNum;
 	}
-	public Integer getOrigin_line_num() {
-		return origin_line_num;
+	public short getCarNum() {
+		return carNum;
 	}
-	public void setOrigin_line_num(Integer origin_line_num) {
-		this.origin_line_num = origin_line_num;
+	public void setCarNum(short carNum) {
+		this.carNum = carNum;
 	}
-	public Integer getTrain_order_num() {
-		return train_order_num;
+	public short getSrcLineNum() {
+		return srcLineNum;
 	}
-	public void setTrain_order_num(Integer train_order_num) {
-		this.train_order_num = train_order_num;
+	public void setSrcLineNum(short srcLineNum) {
+		this.srcLineNum = srcLineNum;
 	}
-	public Integer getDestin_line_num() {
-		return destin_line_num;
+	public short getTrainNum() {
+		return trainNum;
 	}
-	public void setDestin_line_num(Integer destin_line_num) {
-		this.destin_line_num = destin_line_num;
+	public void setTrainNum(short trainNum) {
+		this.trainNum = trainNum;
 	}
-	public Integer getDestin_num() {
-		return destin_num;
+	public short getDstLineNum() {
+		return dstLineNum;
 	}
-	public void setDestin_num(Integer destin_num) {
-		this.destin_num = destin_num;
+	public void setDstLineNum(short dstLineNum) {
+		this.dstLineNum = dstLineNum;
 	}
-	public Integer getDirection_train() {
-		return direction_train;
+	public int getDstStationNum() {
+		return dstStationNum;
 	}
-	public void setDirection_train(Integer direction_train) {
-		this.direction_train = direction_train;
+	public void setDstStationNum(int dstStationNum) {
+		this.dstStationNum = dstStationNum;
 	}
-	public Integer getPark_stab_status() {
-		return park_stab_status;
+	public short getDirectionPlan() {
+		return directionPlan;
 	}
-	public void setPark_stab_status(Integer park_stab_status) {
-		this.park_stab_status = park_stab_status;
+	public void setDirectionPlan(short directionPlan) {
+		this.directionPlan = directionPlan;
 	}
-	public Integer getThis_station_id() {
-		return this_station_id;
+	public Integer getStation() {
+		return station;
 	}
-	public void setThis_station_id(Integer this_station_id) {
-		this.this_station_id = this_station_id;
+	public void setStation(Integer station) {
+		this.station = station;
 	}
-	public Integer getNext_station_id() {
-		return next_station_id;
+	public Integer getNextStationId() {
+		return nextStationId;
 	}
-	public void setNext_station_id(Integer next_station_id) {
-		this.next_station_id = next_station_id;
+	public void setNextStationId(Integer nextStationId) {
+		this.nextStationId = nextStationId;
+	}
+	public short getTrainPark() {
+		return trainPark;
+	}
+	public void setTrainPark(short trainPark) {
+		this.trainPark = trainPark;
+	}
+	public String getTrainHeaderAtphycical() {
+		return trainHeaderAtphycical;
+	}
+	public void setTrainHeaderAtphycical(String trainHeaderAtphycical) {
+		this.trainHeaderAtphycical = trainHeaderAtphycical;
+	}
+	public int getRunningLevel() {
+		return runningLevel;
+	}
+	public void setRunningLevel(int runningLevel) {
+		this.runningLevel = runningLevel;
+	}
+	public long getTimestamp() {
+		return timestamp;
+	}
+	public void setTimestamp(long timestamp) {
+		this.timestamp = timestamp;
 	}
 	
-	public Integer getT_head_track_id() {
-		return t_head_track_id;
-	}
-	public void setT_head_track_id(Integer t_head_track_id) {
-		this.t_head_track_id = t_head_track_id;
-	}
-	public Integer getRunning_level() {
-		return running_level;
-	}
-	public void setRunning_level(Integer running_level) {
-		this.running_level = running_level;
-	}
-	public Long getSec() {
-		return sec;
-	}
-	public void setSec(Long sec) {
-		this.sec = sec;
-	}
-	public Long getUsec() {
-		return usec;
-	}
-	public void setUsec(Long usec) {
-		this.usec = usec;
-	}
 	
-
 }

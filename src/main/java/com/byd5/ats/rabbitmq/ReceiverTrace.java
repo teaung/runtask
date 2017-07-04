@@ -16,16 +16,14 @@
 package com.byd5.ats.rabbitmq;
 
 import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-
+import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -81,7 +79,7 @@ public class ReceiverTrace {
 		}
 		
 		// 检查该车是否有记录
-		Integer carNum = event.getTrain_num();
+		Integer carNum = (int) event.getCarNum();
 		TrainRunTask task = null;
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);
@@ -102,6 +100,22 @@ public class ReceiverTrace {
 		else {
 			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
+		
+		// 向战场图发送站停时间
+		AppDataStationTiming appDataStationTiming = null;
+
+		if (task != null) {
+			appDataStationTiming = runTaskService.clientTimeStationStop(task, event);
+	
+			LOG.debug("[trace.station.arrive] AppDataTimeStationStop: this station ["
+					+ appDataStationTiming.getStation_id() + "] section stop time ["
+					+ appDataStationTiming.getTime()
+					+ "s]");
+			sender.sendATOCommand(frameATOCommand);
+		}
+		else {
+			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+		}		
 
 		watch.stop();
 		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -141,7 +155,7 @@ public class ReceiverTrace {
 		}
 		
 		// 检查该车是否有记录
-		Integer carNum = event.getTrain_num();
+		short carNum = event.getTrainNum();
 		TrainRunTask task = null;
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);

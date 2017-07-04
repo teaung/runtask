@@ -11,7 +11,9 @@ public class TrainRunTask {
 	private int traingroupnum = 0;// 车组号
 	private int tablenum = 0;// 表号
 	private int trainnum = 0; // 车次号
-	private List<TrainRunTimetable> rungraphTodayTimetable;// 当日计划运行图时刻表
+	private byte runDirection;//运行方向
+	private int dstStationNum;//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
+	private List<TrainRunTimetable> trainRunTimetable;// 当日计划运行图时刻表
 	
 	public int getTraingroupnum() {
 		return traingroupnum;
@@ -31,10 +33,29 @@ public class TrainRunTask {
 	public void setTrainnum(int trainnum) {
 		this.trainnum = trainnum;
 	}
-	public List<TrainRunTimetable> getRungraphTodayTimetable() {
-		return rungraphTodayTimetable;
+	public String getServTag() {
+		return servTag;
 	}
-	public void setRungraphTodayTimetable(List<TrainRunTimetable> rungraphTodayTimetable) {
-		this.rungraphTodayTimetable = rungraphTodayTimetable;
+	public void setServTag(String servTag) {
+		this.servTag = servTag;
 	}
+	public List<TrainRunTimetable> getTrainRunTimetable() {
+		return trainRunTimetable;
+	}
+	public void setTrainRunTimetable(List<TrainRunTimetable> trainRunTimetable) {
+		this.trainRunTimetable = trainRunTimetable;
+	}
+	public byte getRunDirection() {
+		return runDirection;
+	}
+	public void setRunDirection(byte runDirection) {
+		this.runDirection = runDirection;
+	}
+	public int getDstStationNum() {
+		return dstStationNum;
+	}
+	public void setDstStationNum(int dstStationNum) {
+		this.dstStationNum = dstStationNum;
+	}
+	
 }
