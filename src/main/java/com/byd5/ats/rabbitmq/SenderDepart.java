@@ -26,6 +26,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.protocol.AppProtocolConstant;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
@@ -57,6 +58,12 @@ public class SenderDepart {
 	@Autowired
 	@Qualifier("topicATS2CU")
 	private TopicExchange exATS2CU;
+	
+	@Autowired
+	@Qualifier("topicServ2Cli")
+	private TopicExchange exServ2Cli;
+	
+	String realtimeKey = "serv2cli.trainruntask.realtime";
 	
 	//public final static String SERVID = "traindepart" + UUID.randomUUID().toString().replace("-", "");
 	public final static String SERVID = "traindepart(" + Utils.getLocalIP() + ")";
@@ -152,5 +159,24 @@ public class SenderDepart {
 		LOG.debug("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 	}
 	
-	
+	/**
+	 * 给客户端发送当前站停时间
+	 * @param appDataStationTiming
+	 */
+	public void senderAppDataStationTiming(AppDataStationTiming appDataStationTiming) {
+		
+		ObjectMapper objMapper = new ObjectMapper();
+		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+		
+		String js = null;
+		try {
+			js = objMapper.writeValueAsString(appDataStationTiming);
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
+		LOG.debug("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
+	}
 }

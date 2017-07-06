@@ -46,12 +46,12 @@ public class ReceiverTrace {
 	private SenderDepart sender;
 	
 	/**
-	 * 到站消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间。
+	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
 	 * @param in
 	 * @throws Exception 
 	 */
-	@RabbitListener(queues = "#{queueTraceStationArrive.name}")
-	public void receiveTraceStationArrive(String in) {
+	@RabbitListener(queues = "#{queueTraceStationEnter.name}")
+	public void receiveTraceStationEnter(String in) {
 		StopWatch watch = new StopWatch();
 		watch.start();
 		LOG.debug("[trace.station.arrive] '" + in + "'");
@@ -93,7 +93,8 @@ public class ReceiverTrace {
 	
 			LOG.debug("[trace.station.arrive] ATOCommand: next station ["
 					+ frameATOCommand.getAtoCommand().getNextStationId() + "] section run time ["
-					+ frameATOCommand.getAtoCommand().getSectionRunLevel()
+					+ frameATOCommand.getAtoCommand().getSectionRunLevel()+ "s]"
+					+ "section stop time ["+ frameATOCommand.getAtoCommand().getStationStopTime()
 					+ "s]");
 			sender.sendATOCommand(frameATOCommand);
 		}
@@ -101,32 +102,72 @@ public class ReceiverTrace {
 			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
-		// 向战场图发送站停时间
-		AppDataStationTiming appDataStationTiming = null;
-
-		if (task != null) {
-			appDataStationTiming = runTaskService.clientTimeStationStop(task, event);
-	
-			LOG.debug("[trace.station.arrive] AppDataTimeStationStop: this station ["
-					+ appDataStationTiming.getStation_id() + "] section stop time ["
-					+ appDataStationTiming.getTime()
-					+ "s]");
-			sender.sendATOCommand(frameATOCommand);
-		}
-		else {
-			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
-		}		
-
 		watch.stop();
 		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 
 	/**
+	 * 到站停稳消息处理：根据车次时刻表向客户端发送当前车站的站停时间。
+	 * @param in
+	 * @throws Exception 
+	 */
+	@RabbitListener(queues = "#{queueTraceStationArrive.name}")
+	public void receiveTraceStationArrivetability(String in) {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.debug("[trace.station.arrive] '" + in + "'");
+		TrainEventPosition event = null;
+		ObjectMapper objMapper = new ObjectMapper();
+		
+		//反序列化
+		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
+		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		try {
+			event = objMapper.readValue(in, TrainEventPosition.class);
+		} catch (JsonParseException e) {
+			e.printStackTrace();
+		} catch (JsonMappingException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		// 检查该车是否有记录
+		Integer carNum = (int) event.getCarNum();
+		TrainRunTask task = null;
+		if (runTaskService.mapRunTask.containsKey(carNum)) {
+			task = runTaskService.mapRunTask.get(carNum);
+		}
+		
+		// 向客户端发送站停时间
+		AppDataStationTiming appDataStationTiming = null;
+
+		if (task != null) {
+			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
+	
+			LOG.debug("[trace.station.arrive] AppDataTimeStationStop: this station ["
+					+ appDataStationTiming.getStation_id() + "] section stop time ["
+					+ appDataStationTiming.getTime()
+					+ "s]");
+			sender.senderAppDataStationTiming(appDataStationTiming);
+		}
+		else {
+			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+		}		
+		
+		watch.stop();
+		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
+	
+	
+	/**
 	 * 离站消息处理：根据车次时刻表向VOBC发送命令指定下一个车站是跳停/站停（站停时间）。
 	 * @param in
 	 * @throws Exception 
 	 */
-	@RabbitListener(queues = "#{queueTraceStationLeave.name}")
+	/*@RabbitListener(queues = "#{queueTraceStationLeave.name}")
 	public void receiveTraceStationLeave(String in) {
 		StopWatch watch = new StopWatch();
 		watch.start();
@@ -178,6 +219,6 @@ public class ReceiverTrace {
 				
 		watch.stop();
 		LOG.debug("[trace.station.leave] Done in " + watch.getTotalTimeSeconds() + "s");
-	}
+	}*/
 	
 }

@@ -7,12 +7,12 @@ import java.util.List;
 public class TrainRunTask {
 	
 	public String servTag = "";
-	
+	private short lineNum;			//线路编号
 	private int traingroupnum = 0;// 车组号
 	private int tablenum = 0;// 表号
 	private int trainnum = 0; // 车次号
 	private byte runDirection;//运行方向
-	private int dstStationNum;//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
+	private String dstStationNum;//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
 	private List<TrainRunTimetable> trainRunTimetable;// 当日计划运行图时刻表
 	
 	public int getTraingroupnum() {
@@ -51,11 +51,17 @@ public class TrainRunTask {
 	public void setRunDirection(byte runDirection) {
 		this.runDirection = runDirection;
 	}
-	public int getDstStationNum() {
+	public String getDstStationNum() {
 		return dstStationNum;
 	}
-	public void setDstStationNum(int dstStationNum) {
+	public void setDstStationNum(String dstStationNum) {
 		this.dstStationNum = dstStationNum;
+	}
+	public short getLineNum() {
+		return lineNum;
+	}
+	public void setLineNum(short lineNum) {
+		this.lineNum = lineNum;
 	}
 	
 }

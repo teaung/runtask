@@ -45,11 +45,11 @@ public class Config {
 		return new TopicExchange(AppProtocolConstant.EXCHANGE_CU2ATS); //"topic.cu2ats"
 	}
 
-/*	@Bean
+	@Bean
 	public TopicExchange topicServ2Cli() {
 		return new TopicExchange("topic.serv2cli");
 	}
-
+	/*
 	@Bean
 	public TopicExchange topicCli2Serv() {
 		return new TopicExchange("topic.cli2serv");
@@ -113,13 +113,15 @@ public class Config {
 		public Queue queueTraceStationLeave() {
 			return new AnonymousQueue();
 		}
+		//车辆到站停稳消息
 		@Bean
 		public Binding bindingTraceStationArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationArrive) {
 			return BindingBuilder.bind(queueTraceStationArrive).to(ex).with("ats.traintrace.station.arrive");
 		}
+		//到站（不管是否停稳）
 		@Bean
-		public Binding bindingTraceStationLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationLeave) {
-			return BindingBuilder.bind(queueTraceStationLeave).to(ex).with("ats.traintrace.station.leave");
+		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationLeave) {
+			return BindingBuilder.bind(queueTraceStationLeave).to(ex).with("ats.traintrace.station.enter");
 		}
 		@Bean
 		public ReceiverTrace receiverTrace() {
