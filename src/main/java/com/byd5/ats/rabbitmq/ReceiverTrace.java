@@ -24,6 +24,7 @@ import org.springframework.util.StopWatch;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
+import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -48,13 +49,15 @@ public class ReceiverTrace {
 	/**
 	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
 	 * @param in
-	 * @throws Exception 
+	 * @throws IOException 
+	 * @throws JsonMappingException 
+	 * @throws JsonParseException 
 	 */
 	@RabbitListener(queues = "#{queueTraceStationEnter.name}")
-	public void receiveTraceStationEnter(String in) {
+	public void receiveTraceStationEnter(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		LOG.debug("[trace.station.arrive] '" + in + "'");
+		LOG.debug("[trace.station.enter] '" + in + "'");
 		//System.out.println("[trace] '" + in + "'");
 		//doWork(in);
 		TrainEventPosition event = null;
@@ -65,18 +68,7 @@ public class ReceiverTrace {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		try {
-			event = objMapper.readValue(in, TrainEventPosition.class);
-		} catch (JsonParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (JsonMappingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		event = objMapper.readValue(in, TrainEventPosition.class);
 		
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
@@ -85,18 +77,26 @@ public class ReceiverTrace {
 			task = runTaskService.mapRunTask.get(carNum);
 		}
 		
+		//添加列车到站信息
+		if (!runTaskService.mapTrace.containsKey(carNum)) {
+			runTaskService.mapTrace.put(carNum, event);
+		}
+		else {
+			runTaskService.mapTrace.replace(carNum, event);
+		}
+		
 		// 向该车发送站间运行等级
-		FrameATOCommand frameATOCommand = null;
+		AppDataATOCommand appDataATOCommand = null;
 
 		if (task != null) {
-			frameATOCommand = runTaskService.frameATOCommandArrive(task, event);
+			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
 	
 			LOG.debug("[trace.station.arrive] ATOCommand: next station ["
-					+ frameATOCommand.getAtoCommand().getNextStationId() + "] section run time ["
-					+ frameATOCommand.getAtoCommand().getSectionRunLevel()+ "s]"
-					+ "section stop time ["+ frameATOCommand.getAtoCommand().getStationStopTime()
+					+ appDataATOCommand.getNextStationId() + "] section run time ["
+					+ appDataATOCommand.getSectionRunLevel()+ "s]"
+					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
 					+ "s]");
-			sender.sendATOCommand(frameATOCommand);
+			sender.sendATOCommand(appDataATOCommand);
 		}
 		else {
 			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
@@ -109,10 +109,12 @@ public class ReceiverTrace {
 	/**
 	 * 到站停稳消息处理：根据车次时刻表向客户端发送当前车站的站停时间。
 	 * @param in
-	 * @throws Exception 
+	 * @throws IOException 
+	 * @throws JsonMappingException 
+	 * @throws JsonParseException 
 	 */
 	@RabbitListener(queues = "#{queueTraceStationArrive.name}")
-	public void receiveTraceStationArrivetability(String in) {
+	public void receiveTraceStationArrive(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
 		LOG.debug("[trace.station.arrive] '" + in + "'");
@@ -124,15 +126,7 @@ public class ReceiverTrace {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		try {
-			event = objMapper.readValue(in, TrainEventPosition.class);
-		} catch (JsonParseException e) {
-			e.printStackTrace();
-		} catch (JsonMappingException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		event = objMapper.readValue(in, TrainEventPosition.class);
 		
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
@@ -160,65 +154,5 @@ public class ReceiverTrace {
 		watch.stop();
 		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
-	
-	
-	/**
-	 * 离站消息处理：根据车次时刻表向VOBC发送命令指定下一个车站是跳停/站停（站停时间）。
-	 * @param in
-	 * @throws Exception 
-	 */
-	/*@RabbitListener(queues = "#{queueTraceStationLeave.name}")
-	public void receiveTraceStationLeave(String in) {
-		StopWatch watch = new StopWatch();
-		watch.start();
-		LOG.debug("[trace.station.leave] '" + in + "'");
-		//System.out.println("[trace] '" + in + "'");
-		//doWork(in);
-		TrainEventPosition event = null;
-		ObjectMapper objMapper = new ObjectMapper();
-		
-		//反序列化
-		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
-		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
-		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-		
-		try {
-			event = objMapper.readValue(in, TrainEventPosition.class);
-		} catch (JsonParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (JsonMappingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		// 检查该车是否有记录
-		short carNum = event.getTrainNum();
-		TrainRunTask task = null;
-		if (runTaskService.mapRunTask.containsKey(carNum)) {
-			task = runTaskService.mapRunTask.get(carNum);
-		}
-		
-		// 向该车发送下一停站站台、站停时间
-		FrameATOCommand frameATOCommand = null;
-		if (task != null) {
-			frameATOCommand = runTaskService.frameATOCommandLeave(task, event);
-
-			LOG.debug("[trace.station.leave] ATOCommand: next station ["
-					+ frameATOCommand.getAtoCommand().getNextStationId() + "] stop time ["
-					+ frameATOCommand.getAtoCommand().getStationStopTime()
-					+ "s]");
-			sender.sendATOCommand(frameATOCommand);
-		}
-		else {
-			LOG.debug("[trace.station.leave] not find the car (" + carNum + ") in runTask list, so do nothing.");
-		}
-				
-		watch.stop();
-		LOG.debug("[trace.station.leave] Done in " + watch.getTotalTimeSeconds() + "s");
-	}*/
 	
 }

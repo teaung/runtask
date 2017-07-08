@@ -1,9 +1,12 @@
 spring:
+  application:
+    name: serv39-trainruntask
+    
   profiles:
     active: topics,sender,remote
 
   rabbitmq:
-    host: 10.5.133.213
+    host: 10.5.133.220
     port: 5672
     username: guest
     password: guest
@@ -20,3 +23,12 @@ logging:
 tutorial:
   client:
     duration: 10000
+    
+    
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://10.5.133.219:8761/eureka/
+      
+server:
+  port: 60039

@@ -16,18 +16,14 @@
 package com.byd5.ats.rabbitmq;
 
 import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-
+import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd5.ats.message.TrainRunTimetable;
-import com.byd5.ats.protocol.ats_ci.FrameCIStatus;
 import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
-import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -35,14 +31,11 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * 接收运行图的消息
+ * 接收运行调整的消息
  * 
  */
-public class ReceiverRungraph {
-	private final static Logger LOG = LoggerFactory.getLogger(ReceiverRungraph.class);
-	
-/*	@Autowired
-	private AtsWebSocketHandler atsWebsocket;*/
+public class ReceiverAdjust {
+	private final static Logger LOG = LoggerFactory.getLogger(ReceiverAdjust.class);
 	
 	@Autowired
 	private RunTaskService runTaskHandler;
@@ -50,16 +43,13 @@ public class ReceiverRungraph {
 	@Autowired
 	private SenderDepart sender;
 
-	@RabbitListener(queues = "#{queueRungraph.name}")
-	public void receiveRungraph(String in) throws Exception {
+	@RabbitListener(queues = "#{queueAdjust.name}")
+	public void receiveAdjust(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		//System.out.println("[rungraph] '" + in + "'");
-		//doWork(in);
-		LOG.debug("[rungraph] '" + in + "'");
+		LOG.debug("[adjust] '" + in + "'");
 		
-		TrainRunTask task = null;
-		TrainRunTimetable timetable = null;
+		TrainRunTask adjustTask = null;
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
@@ -68,25 +58,40 @@ public class ReceiverRungraph {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		task = objMapper.readValue(in, TrainRunTask.class);
+		adjustTask = objMapper.readValue(in, TrainRunTask.class);
 		
-		// 添加运行任务列表
-		//runTaskHandler.runTaskList.add(task);
-		Integer carNum = task.getTraingroupnum();
+		// 更新运行任务列表
+		Integer carNum = adjustTask.getTraingroupnum();
 		if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
-			runTaskHandler.mapRunTask.put(carNum, task);
+			runTaskHandler.mapRunTask.put(carNum, adjustTask);
 		}
 		else {
-			runTaskHandler.mapRunTask.replace(carNum, task);
+			runTaskHandler.mapRunTask.replace(carNum, adjustTask);
 		}
 		
-		// 向该车发送表号、车次号
+		TrainEventPosition event = null;
+		// 检查该车是否有记录
+		if (runTaskHandler.mapTrace.containsKey(carNum)) {
+			event = runTaskHandler.mapTrace.get(carNum);
+		}		
+				
+		// 重新向该车发送下一站区间运行时间
 		AppDataATOCommand appDataATOCommand = null;
-		appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);
-		
-		sender.sendATOCommand(appDataATOCommand);
+		if(event != null){
+			appDataATOCommand = runTaskHandler.appDataATOCommandEnter(adjustTask, event);
+			sender.sendATOCommand(appDataATOCommand);
+			
+			LOG.info("[adjust] ATOCommand: next station ["
+					+ appDataATOCommand.getNextStationId() + "] next section run time ["
+					+ appDataATOCommand.getSectionRunLevel()+ "s]"
+					+ "This station stop time ["+ appDataATOCommand.getStationStopTime()
+					+ "s]");
+		}
+		else {
+			LOG.debug("[adjust] not find the car (" + carNum + ") in trace list, so do nothing.");
+		}
 		
 		watch.stop();
-		System.out.println("[rungraph] Done in " + watch.getTotalTimeSeconds() + "s");
+		System.out.println("[adjust] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 }

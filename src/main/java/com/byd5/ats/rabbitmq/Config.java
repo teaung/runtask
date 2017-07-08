@@ -49,11 +49,6 @@ public class Config {
 	public TopicExchange topicServ2Cli() {
 		return new TopicExchange("topic.serv2cli");
 	}
-	/*
-	@Bean
-	public TopicExchange topicCli2Serv() {
-		return new TopicExchange("topic.cli2serv");
-	}*/
 	
 	@Bean
 	public TopicExchange exchangeRungraph() {
@@ -66,7 +61,13 @@ public class Config {
 
 	@Bean
 	public TopicExchange exchangeDepart() {
+		//return new TopicExchange("topic.ats2aod");
 		return new TopicExchange("topic.ats.traindepart");
+	}
+	
+	@Bean
+	public TopicExchange exchangeAdjust() {
+		return new TopicExchange("topic.ats.trainadjust");
 	}
 	
 	//@Profile("receiver")
@@ -77,27 +78,24 @@ public class Config {
 			return new ReceiverRungraph();
 		}
 		
-
-		
 		@Bean
 		public ReceiverDepart receiverDepart() {
 			return new ReceiverDepart();
 		}
-		
-
-/*		@Bean
-		public Queue autoDeleteQueue1() {
-			return new AnonymousQueue();
-		}
-
-		@Bean
-		public Queue autoDeleteQueue2() {
-			return new AnonymousQueue();
-		}*/
 
 		@Bean
 		public Queue queueRungraph() {
 			return new AnonymousQueue();
+		}
+		
+		@Bean
+		public Queue queueAdjust() {
+			return new AnonymousQueue();
+		}
+		
+		@Bean
+		public Binding bindingAdjust(@Qualifier("exchangeAdjust") TopicExchange ex, Queue queueAdjust) {
+			return BindingBuilder.bind(queueAdjust).to(ex).with("ats.trainadjust.runtime");
 		}
 		
 		@Bean
@@ -110,7 +108,7 @@ public class Config {
 			return new AnonymousQueue();
 		}
 		@Bean
-		public Queue queueTraceStationLeave() {
+		public Queue queueTraceStationEnter() {
 			return new AnonymousQueue();
 		}
 		//车辆到站停稳消息
@@ -120,8 +118,8 @@ public class Config {
 		}
 		//到站（不管是否停稳）
 		@Bean
-		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationLeave) {
-			return BindingBuilder.bind(queueTraceStationLeave).to(ex).with("ats.traintrace.station.enter");
+		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationEnter) {
+			return BindingBuilder.bind(queueTraceStationEnter).to(ex).with("ats.traintrace.station.enter");
 		}
 		@Bean
 		public ReceiverTrace receiverTrace() {
@@ -138,20 +136,6 @@ public class Config {
 			return BindingBuilder.bind(queueDepart).to(ex).with("ats.traindepart.*");
 		}
 		
-	/*	@Bean
-		public Binding binding1a(@Qualifier("topicTest") TopicExchange topic, Queue autoDeleteQueue1) {
-			return BindingBuilder.bind(autoDeleteQueue1).to(topic).with("*.orange.*");
-		}
-
-		@Bean
-		public Binding binding1b(@Qualifier("topicCU2ATS") TopicExchange topic, Queue autoDeleteQueue1) {
-			return BindingBuilder.bind(autoDeleteQueue1).to(topic).with("*.*.rabbit");
-		}
-
-		@Bean
-		public Binding binding2a(@Qualifier("topicTest") TopicExchange topic, Queue autoDeleteQueue2) {
-			return BindingBuilder.bind(autoDeleteQueue2).to(topic).with("lazy.#");
-		}*/
 		@Bean
 		public Queue queueATOStatus() {
 			return new AnonymousQueue();
@@ -167,7 +151,6 @@ public class Config {
 	}
 
 	//@Profile("sender")
-
 	@Bean
 	public SenderDepart senderDepart() {
 		return new SenderDepart();

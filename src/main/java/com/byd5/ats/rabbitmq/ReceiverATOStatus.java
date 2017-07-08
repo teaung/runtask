@@ -34,7 +34,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * 接收运行图的消息
  * 
  */
-public class ReceiverATOStatus {
+public class ReceiverATOStatus {/*
 		
 	@Autowired
 	private RunTaskService runTaskHandler;
@@ -79,4 +79,4 @@ public class ReceiverATOStatus {
 //		System.out.println("[atostatus] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 
-}
+*/}

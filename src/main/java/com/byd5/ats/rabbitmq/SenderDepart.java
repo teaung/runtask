@@ -29,6 +29,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.protocol.AppProtocolConstant;
+import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -73,108 +74,51 @@ public class SenderDepart {
 
 	private int count;
 
-	/*private final String[] keys = {"quick.orange.rabbit", "lazy.orange.elephant", "quick.orange.fox",
-			"lazy.brown.fox", "lazy.pink.rabbit", "quick.brown.fox"};*/
-
-	/*@Scheduled(fixedDelay = 1000, initialDelay = 500)
-	public void send() {
-		StringBuilder builder = new StringBuilder("Hello to ");
-		if (++this.index == keys.length) {
-			this.index = 0;
-		}
-		String key = keys[this.index];
-		builder.append(key).append(' ');
-		builder.append(Integer.toString(++this.count));
-		String message = builder.toString();
-		template.convertAndSend(topic.getName(), key, message);
-		System.out.println(" [x] Sent '" + message + "'");
-	}*/
-
-/*	public void send(String msg) {
-		//StringBuilder builder = new StringBuilder("Hello to ");
-		StringBuilder builder = new StringBuilder("'" + msg + "' ");
-		if (++this.index == keys.length) {
-			this.index = 0;
-		}
-		String key = keys[this.index];
-		builder.append(key).append(' ');
-		builder.append(Integer.toString(++this.count));
-		String message = builder.toString();
-		template.convertAndSend(topic.getName(), key, message);
-		System.out.println(" [x] Sent '" + message + "'");
-	}*/
-	
-	public void sendDepart(TrainRunTimetable table) {
+	public void sendDepart(TrainRunTimetable table) throws JsonProcessingException {
 		
 		table.servTag = this.tag;
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
-		//序列化
-		//为了使JSON可读，配置缩进输出；生产环境中不需要这样设置
-		//objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-		//配置mapper忽略空属性
-		//objMapper.setSerializationInclusion(Include.NON_EMPTY);
-		//默认情况，Jackson使用Java属性字段名称作为Json的属性名称，也可以使用Jackson注解改变Json属性名称
-		
 		String js = null;
-		try {
-			//s = objMapper.writeValueAsString(ciStatus);
-			js = objMapper.writeValueAsString(table);
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		//System.out.println(js);
+		js = objMapper.writeValueAsString(table);
+		
 		String routeKey = "ats.traindepart.timetable";
 		template.convertAndSend(topic.getName(), routeKey, js);
-		//System.out.println("[departS] '" + js + "'");
 		LOG.debug("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
 	}
 	
-	
-	public void sendATOCommand(FrameATOCommand fCommand) {
+	/**
+	 * 给AOD发送AOD命令信息帧
+	 * @param appDataATOCommand
+	 * @throws JsonProcessingException
+	 */
+	public void sendATOCommand(AppDataATOCommand appDataATOCommand) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
-		
-		//序列化
-		//为了使JSON可读，配置缩进输出；生产环境中不需要这样设置
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-		//配置mapper忽略空属性
-		//objMapper.setSerializationInclusion(Include.NON_EMPTY);
-		//默认情况，Jackson使用Java属性字段名称作为Json的属性名称，也可以使用Jackson注解改变Json属性名称
 		
 		String js = null;
-		try {
-			//s = objMapper.writeValueAsString(ciStatus);
-			js = objMapper.writeValueAsString(fCommand);
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		//System.out.println(js);
-		String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
+		js = objMapper.writeValueAsString(appDataATOCommand);
+
+		//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
+		String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
 		template.convertAndSend(exATS2CU.getName(), routeKey, js);
-		//System.out.println("[departX] '" + js + "'");
 		LOG.debug("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 	}
 	
 	/**
-	 * 给客户端发送当前站停时间
+	 * 给客户端发送当前车站站停时间
 	 * @param appDataStationTiming
+	 * @throws JsonProcessingException 
 	 */
-	public void senderAppDataStationTiming(AppDataStationTiming appDataStationTiming) {
+	public void senderAppDataStationTiming(AppDataStationTiming appDataStationTiming) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		
 		String js = null;
-		try {
-			js = objMapper.writeValueAsString(appDataStationTiming);
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		js = objMapper.writeValueAsString(appDataStationTiming);
 		
 		template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
 		LOG.debug("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
