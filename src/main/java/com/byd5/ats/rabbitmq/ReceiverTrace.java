@@ -57,7 +57,7 @@ public class ReceiverTrace {
 	public void receiveTraceStationEnter(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		LOG.debug("[trace.station.enter] '" + in + "'");
+		LOG.info("[trace.station.enter] '" + in + "'");
 		//System.out.println("[trace] '" + in + "'");
 		//doWork(in);
 		TrainEventPosition event = null;
@@ -91,7 +91,7 @@ public class ReceiverTrace {
 		if (task != null) {
 			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
 	
-			LOG.debug("[trace.station.arrive] ATOCommand: next station ["
+			LOG.info("[trace.station.arrive] ATOCommand: next station ["
 					+ appDataATOCommand.getNextStationId() + "] section run time ["
 					+ appDataATOCommand.getSectionRunLevel()+ "s]"
 					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
@@ -99,11 +99,11 @@ public class ReceiverTrace {
 			sender.sendATOCommand(appDataATOCommand);
 		}
 		else {
-			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
 		watch.stop();
-		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 
 	/**
@@ -117,7 +117,7 @@ public class ReceiverTrace {
 	public void receiveTraceStationArrive(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		LOG.debug("[trace.station.arrive] '" + in + "'");
+		LOG.info("[trace.station.arrive] '" + in + "'");
 		TrainEventPosition event = null;
 		ObjectMapper objMapper = new ObjectMapper();
 		
@@ -141,18 +141,18 @@ public class ReceiverTrace {
 		if (task != null) {
 			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
 	
-			LOG.debug("[trace.station.arrive] AppDataTimeStationStop: this station ["
+			LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
 					+ appDataStationTiming.getStation_id() + "] section stop time ["
 					+ appDataStationTiming.getTime()
 					+ "s]");
 			sender.senderAppDataStationTiming(appDataStationTiming);
 		}
 		else {
-			LOG.debug("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}		
 		
 		watch.stop();
-		LOG.debug("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
 }

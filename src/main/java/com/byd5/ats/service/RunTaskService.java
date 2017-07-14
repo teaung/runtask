@@ -44,9 +44,9 @@ public class RunTaskService {
 
 		cmd.setServiceNum((short) task.getTablenum());
 		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setNextZcId(0xffffffff);
-		cmd.setNextCiId(0xffffffff);
-		cmd.setNextAtsId(0xffffffff);
+		cmd.setNextZcId(0);//0xffffffff
+		cmd.setNextCiId(0);
+		cmd.setNextAtsId(0);
 		cmd.setCarLineNum(task.getLineNum());
 		cmd.setCarNum((short) task.getTraingroupnum());
 		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
@@ -66,9 +66,9 @@ public class RunTaskService {
 		cmd.setSkipNextStation((short) 0xFF);
 		cmd.setSectionRunLevel(0xFFFF);
 		
-		cmd.setDetainCmd((short) 0xFF);
-		cmd.setReturnCmd((short) 0xFF);
-		cmd.setGotoRailYard((short) 0xFF);
+		cmd.setDetainCmd((short) 0);
+		cmd.setReturnCmd((short) 0);
+		cmd.setGotoRailYard((short) 0);
 		cmd.setDoorControl((short) 0xFF);
 		cmd.setReserved(0);
 		
@@ -101,13 +101,13 @@ public class RunTaskService {
 		}
 		
 		timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
-		timeStationStop = (int) ((nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000); // 站停时间（单位：秒）
+		timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 
 		cmd.setServiceNum((short) task.getTablenum());
 		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setNextZcId(0xffffffff);
-		cmd.setNextCiId(0xffffffff);
-		cmd.setNextAtsId(0xffffffff);
+		cmd.setNextZcId(0);
+		cmd.setNextCiId(0);
+		cmd.setNextAtsId(0);
 		cmd.setCarLineNum(task.getLineNum());
 		cmd.setCarNum((short) task.getTraingroupnum());
 		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
@@ -118,7 +118,7 @@ public class RunTaskService {
 		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
 		
 		//若当前车站是终点站，则只发当前车站站停时间
-		if(currStation.getNextPlatformId() == 6){
+		if(currStation.getPlatformId() == 6){
 			cmd.setSkipStationId(0xFFFF);
 			cmd.setSkipNextStation((short) 0xFF);
 			cmd.setNextStationId(0xFFFF);
@@ -143,9 +143,9 @@ public class RunTaskService {
 			cmd.setSectionRunLevel(timeSectionRun);
 		}
 		
-		cmd.setDetainCmd((short) 0xFF);
-		cmd.setReturnCmd((short) 0xFF);
-		cmd.setGotoRailYard((short) 0xFF);
+		cmd.setDetainCmd((short) 0);
+		cmd.setReturnCmd((short) 0);
+		cmd.setGotoRailYard((short) 0);
 		cmd.setDoorControl((short) 0xFF);
 		cmd.setReserved(0);
 		
@@ -164,7 +164,7 @@ public class RunTaskService {
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
 		TrainRunTimetable currStation = null;
-		for (int i = 1; i < timetableList.size()-2; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
 				currStation = t;
@@ -173,7 +173,7 @@ public class RunTaskService {
 		int timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
 		
 		AppDataStationTiming appDataStationTiming = new AppDataStationTiming();
-		appDataStationTiming.setStation_id(currStation.getNextPlatformId());
+		appDataStationTiming.setStation_id(currStation.getPlatformId());
 		appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
 		
 		return appDataStationTiming;

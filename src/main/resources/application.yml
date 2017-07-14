@@ -6,11 +6,11 @@ spring:
     active: topics,sender,remote
 
   rabbitmq:
-    host: 10.5.133.220
+    host: 10.5.133.219
     port: 5672
-    username: guest
-    password: guest
-    virtual-host: /
+    username: atsusr
+    password: atspwd
+    virtual-host: atshst
 
 ats:
   serv:
@@ -30,5 +30,3 @@ eureka:
     serviceUrl:
       defaultZone: http://10.5.133.219:8761/eureka/
       
-server:
-  port: 60039

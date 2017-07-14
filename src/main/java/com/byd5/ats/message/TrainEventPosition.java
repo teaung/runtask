@@ -5,20 +5,20 @@ public class TrainEventPosition {
 	
 	public String servTag;
 	public short serviceNum;
-	public short lineNum;					//线路编号（2字节）：全网统一标识
-	public short carLineNum;				//车组所属线路编号（2字节）：全网统一标识
-	public short carNum;					// 车组号（2字节）：
-	public short srcLineNum;				//源线路编号（2字节））：列车始发站线路编号；默认值为0xffff；全网统一标识
-	public short trainNum;					//车次号（2字节）：0000～9999；默认值0000
-	public short dstLineNum;				//目的地线路编号（2字节）：同线路编号；列车为非计划车时，发送默认值0xffff
-	public int dstStationNum;				//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
-	public short directionPlan;				//计划运行方向（1字节）：上行=0x55；下行=0xAA
-	public Integer station;					//目前所在站台id
-	public Integer nextStationId;			//下一停车站台ID（2字节）：定义同“跳停站台ID”，默认值为0xFFFF
-	public short  trainPark;         		// 列车停稳状态  停稳且停准：0x55 未停稳/未停准：0xAA
-	public String trainHeaderAtphycical;   	//车头所在的物理区段
-	private int runningLevel;				//运行等级
-	private long timestamp;					//精确到ms
+	public short lineNum;//线路编号（2字节）：全网统一标识
+	public short carLineNum;//车组所属线路编号（2字节）：全网统一标识
+	public short carNum;// 车组号（2字节）：
+	public short srcLineNum;//源线路编号（2字节））：列车始发站线路编号；默认值为0xffff；全网统一标识
+	public short trainNum;//车次号（2字节）：0000～9999；默认值0000
+	public short dstLineNum;//目的地线路编号（2字节）：同线路编号；列车为非计划车时，发送默认值0xffff
+	public String dstStationNum;//目的地号（4字节）：用ASCII码标识，最多4个ASCII码，低于4个时高位用空格补齐；
+	public short directionPlan;//计划运行方向（1字节）：上行=0x55；下行=0xAA
+	public Integer station;//目前所在站台id
+	public Integer nextStationId;//下一停车站台ID（2字节）：定义同“跳停站台ID”，默认值为0xFFFF
+	public short  trainPark;         // 列车停稳状态  停稳且停准：0x55 未停稳/未停准：0xAA
+	public String trainHeaderAtphycical;   //车头所在的物理区段
+	private int runningLevel;//运行等级
+	private long timestamp;//精确到ms
 	
 	public String getServTag() {
 		return servTag;
@@ -68,10 +68,10 @@ public class TrainEventPosition {
 	public void setDstLineNum(short dstLineNum) {
 		this.dstLineNum = dstLineNum;
 	}
-	public int getDstStationNum() {
+	public String getDstStationNum() {
 		return dstStationNum;
 	}
-	public void setDstStationNum(int dstStationNum) {
+	public void setDstStationNum(String dstStationNum) {
 		this.dstStationNum = dstStationNum;
 	}
 	public short getDirectionPlan() {

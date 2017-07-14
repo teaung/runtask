@@ -103,8 +103,8 @@ public class SenderDepart {
 
 		//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
 		String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
-		template.convertAndSend(exATS2CU.getName(), routeKey, js);
-		LOG.debug("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
+		template.convertAndSend(topic.getName(), routeKey, js);
+		LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
 	}
 	
 	/**
@@ -121,6 +121,6 @@ public class SenderDepart {
 		js = objMapper.writeValueAsString(appDataStationTiming);
 		
 		template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
-		LOG.debug("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
+		LOG.info("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
 	}
 }

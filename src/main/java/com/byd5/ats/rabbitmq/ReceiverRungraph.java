@@ -56,7 +56,7 @@ public class ReceiverRungraph {
 		watch.start();
 		//System.out.println("[rungraph] '" + in + "'");
 		//doWork(in);
-		LOG.debug("[rungraph] '" + in + "'");
+		LOG.info("[rungraph] '" + in + "'");
 		
 		TrainRunTask task = null;
 		TrainRunTimetable timetable = null;

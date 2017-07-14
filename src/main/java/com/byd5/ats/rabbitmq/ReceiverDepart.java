@@ -36,7 +36,7 @@ public class ReceiverDepart {
 		StopWatch watch = new StopWatch();
 		watch.start();
 		//System.out.println("[departR] '" + in + "'");
-		LOG.debug("[departR] '" + in + "'");
+		LOG.info("[departR] '" + in + "'");
 		
 		//doWork(in);
 		watch.stop();

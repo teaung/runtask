@@ -20,9 +20,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
  * @author wu.xianglan
  *
  */
-@Component
+/*@Component
 @Configurable
-@EnableScheduling
+@EnableScheduling*/
 public class test{
 	
 	private static final Logger logger = LoggerFactory.getLogger(test.class);
@@ -39,7 +39,7 @@ public class test{
 	String realtimeKey = "ats.traindepart.aod.command";
     //每1分钟执行一次
     //@Scheduled(cron = "0 */1 *  * * * ")
-	@Scheduled(fixedRate = 1000)
+	//@Scheduled(fixedRate = 1000)
 	public void senderAppDataStationTiming() {
 		
 		ObjectMapper objMapper = new ObjectMapper();
