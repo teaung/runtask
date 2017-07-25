@@ -74,6 +74,11 @@ public class Config {
 	private static class ReceiverConfig {
 
 		@Bean
+		public ReceiverAdjust receiverAdjust() {
+			return new ReceiverAdjust();
+		}
+		
+		@Bean
 		public ReceiverRungraph receiverRungraph() {
 			return new ReceiverRungraph();
 		}

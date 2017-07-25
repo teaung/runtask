@@ -1,4 +1,4 @@
-package com.byd5.ats.service;
+/*package com.byd5.ats.service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,31 +19,31 @@ import com.byd5.ats.protocol.ats_vobc.AppDataATOStatus;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.protocol.ats_vobc.FrameATOStatus;
 
-/**
+*//**
  * 列车运行任务处理类
  * @author hehg
  *
- */
+ *//*
 @Component
 public class RunTaskService2 {
 
-	/**
+	*//**
 	 * 运行任务map：以车组号为key，TrainRunTask类为value
-	 */
+	 *//*
 	public Map<Integer, TrainRunTask> mapRunTask = new HashMap<Integer, TrainRunTask>();
 
-	/**
+	*//**
 	 * 列车ATO状态map：以车组号为key，FrameATOStatus类为value
-	 */
+	 *//*
 	public Map<Integer, FrameATOStatus> mapATOStatus = new HashMap<Integer, FrameATOStatus>();
 	
 	//public List<TrainRunTask> runTaskList = new ArrayList<TrainRunTask>();
 	//public FrameATOStatus frameATOStatus = new FrameATOStatus();
-	/**
+	*//**
 	 * 当列车到达转换轨时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令
 	 * @param task
 	 * @return
-	 */
+	 *//*
 	public FrameATOCommand frameATOCommandTask(TrainRunTask task) throws Exception {
 		FrameATOCommand fCommand = new FrameATOCommand();
 		AppDataATOCommand cmd = new AppDataATOCommand();
@@ -102,11 +102,11 @@ public class RunTaskService2 {
 		return fCommand;
 	}
 	
-	/**
+	*//**
 	 * 当列车到站停稳后，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向VOBC发送下一区间运行命令：设置区间运行等级，下一站台
 	 * @param event
 	 * @return
-	 */
+	 *//*
 	public FrameATOCommand frameATOCommandArrive(TrainRunTask task, TrainEventPosition event) {
 		FrameATOCommand fCommand = new FrameATOCommand();
 		AppDataATOCommand cmd = new AppDataATOCommand();
@@ -116,12 +116,12 @@ public class RunTaskService2 {
 		FrameATOStatus fStatus = new FrameATOStatus();
 		
 		Integer carNum = (int) event.getCarNum();
-		/*if (mapRunTask.containsKey(carNum)) {
+		if (mapRunTask.containsKey(carNum)) {
 			task = mapRunTask.get(carNum);
 		}
 		else {
 			// TODO
-		}*/
+		}
 		
 		//Integer carNum = event.getTrain_num();
 		if (mapATOStatus.containsKey(carNum)) {
@@ -196,11 +196,11 @@ public class RunTaskService2 {
 		return fCommand;
 	}
 	
-	/**
+	*//**
 	 * 当列车离站时，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向VOBC发送下一站台操作命令：跳停/站停（设置站停时间）
 	 * @param event
 	 * @return
-	 */
+	 *//*
 	public FrameATOCommand frameATOCommandLeave(TrainRunTask task, TrainEventPosition event) {
 		FrameATOCommand fCommand = new FrameATOCommand();
 		AppDataATOCommand cmd = new AppDataATOCommand();
@@ -210,12 +210,12 @@ public class RunTaskService2 {
 		FrameATOStatus fStatus = new FrameATOStatus();
 		
 		Integer carNum = (int) event.getCarNum();
-		/*if (mapRunTask.containsKey(carNum)) {
+		if (mapRunTask.containsKey(carNum)) {
 			task = mapRunTask.get(carNum);
 		}
 		else {
 			// TODO
-		}*/
+		}
 		
 		//Integer carNum = event.getTrain_num();
 		if (mapATOStatus.containsKey(carNum)) {
@@ -227,10 +227,10 @@ public class RunTaskService2 {
 
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 		TrainRunTimetable last = timetableList.get(timetableList.size()-1);
-/*		if (platformId == last.getPlatformId()) {
+		if (platformId == last.getPlatformId()) {
 			// 到达本车次的终点站，根据车次时刻表向VOBC发送折返命令
 			// TODO
-		}*/
+		}
 
 		TrainRunTimetable currStation = null;
 		TrainRunTimetable nextStation = null;
@@ -301,11 +301,11 @@ public class RunTaskService2 {
 	}
 	
 	
-	/**
+	*//**
 	 * 当列车到站时，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向客户端发送列车站停时间
 	 * @param event
 	 * @return
-	 */
+	 *//*
 	public AppDataStationTiming clientTimeStationStop(TrainRunTask task, TrainEventPosition event) {
 
 		int platformId = event.getStation();
@@ -333,3 +333,4 @@ public class RunTaskService2 {
 		return appDataStationTiming;
 	}
 }
+*/

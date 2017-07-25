@@ -4,11 +4,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
+
+import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
-import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
 import com.byd5.ats.protocol.ats_vobc.FrameATOStatus;
 
 /**

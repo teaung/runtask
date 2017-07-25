@@ -30,3 +30,15 @@ eureka:
     serviceUrl:
       defaultZone: http://10.5.133.219:8761/eureka/
       
+info:
+  app:
+    artiface: "@project.artifact@"
+    name: "@project.name@"
+    description: "@project.description@"
+    version: "@project.version@"
+    spring-boot-artifact: "@project.parent.artifact@"
+    spring-boot-version: "@project.parent.version@"     
+
+    
+server:
+  port: 60039

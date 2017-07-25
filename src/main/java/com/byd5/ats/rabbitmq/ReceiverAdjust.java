@@ -21,9 +21,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
+
+import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -47,7 +48,7 @@ public class ReceiverAdjust {
 	public void receiveAdjust(String in) throws JsonParseException, JsonMappingException, IOException {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		LOG.debug("[adjust] '" + in + "'");
+		LOG.info("[adjust] '" + in + "'");
 		
 		TrainRunTask adjustTask = null;
 		
@@ -88,7 +89,7 @@ public class ReceiverAdjust {
 					+ "s]");
 		}
 		else {
-			LOG.debug("[adjust] not find the car (" + carNum + ") in trace list, so do nothing.");
+			LOG.info("[adjust] not find the car (" + carNum + ") in trace list, so do nothing.");
 		}
 		
 		watch.stop();

@@ -5,7 +5,7 @@
 
 	<groupId>com.byd5.ats</groupId>
 	<artifactId>serv39-trainruntask</artifactId>
-	<version>0.1.0</version>
+	<version>0.3.0</version>
 
 	<properties>
 		<java.version>1.8</java.version>
@@ -40,6 +40,12 @@
 			<artifactId>spring-boot-starter-amqp</artifactId>
 		</dependency>
 
+		<!-- Use actuator (actuator) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		
 		<!-- customized package: protocol class library for ATS to CI/ZC/VOBC -->
 		<dependency>
 			<groupId>com.byd5.ats</groupId>

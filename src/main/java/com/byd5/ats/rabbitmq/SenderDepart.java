@@ -26,10 +26,10 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.protocol.AppProtocolConstant;
-import com.byd5.ats.protocol.ats_vobc.AppDataATOCommand;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
