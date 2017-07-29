@@ -24,7 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-import com.byd5.ats.protocol.AppProtocolConstant;
+import com.byd.ats.protocol.AppProtocolConstant;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 

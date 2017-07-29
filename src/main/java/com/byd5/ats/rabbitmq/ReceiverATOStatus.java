@@ -23,7 +23,7 @@ import org.springframework.util.StopWatch;
 
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
-import com.byd5.ats.protocol.ats_vobc.FrameATOStatus;
+import com.byd.ats.protocol.ats_vobc.FrameATOStatus;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;

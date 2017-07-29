@@ -14,7 +14,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>1.5.2.RELEASE</version>
+		<version>1.5.3.RELEASE</version>
 	</parent>
 
 	<dependencies>
@@ -48,9 +48,9 @@
 		
 		<!-- customized package: protocol class library for ATS to CI/ZC/VOBC -->
 		<dependency>
-			<groupId>com.byd5.ats</groupId>
+			<groupId>com.byd.ats</groupId>
 			<artifactId>lib01-protocol-ats2ext</artifactId>
-			<version>0.0.2</version>
+			<version>0.1.0</version>
 		</dependency>
 
 		<dependency>
@@ -80,5 +80,84 @@
 			</plugin>
 		</plugins>
 	</build>
+<!--
+	<repositories>
+		<repository>
+			<id>spring-all</id>
+			<name>Spring Snapshots</name>
+			<url>https://repo.spring.io/repo</url>
+		</repository>
+		<repository>
+			<id>spring-milestone</id>
+			<url>https://repo.spring.io/libs-milestone</url>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>spring-snapshots</id>
+			<name>Spring Snapshots</name>
+			<url>https://repo.spring.io/snapshot</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</pluginRepository>
+		<pluginRepository>
+			<id>spring-milestones</id>
+			<name>Spring Milestones</name>
+			<url>https://repo.spring.io/milestone</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+-->
+
+	<repositories>
+		<repository>
+			<id>maven-local</id>
+			<name>Maven local repository</name>
+			<url>http://10.5.133.220:8081/repository/maven-central/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>maven-local-releases</id>
+			<name>Maven Local Release Repository</name>
+			<url>http://10.5.133.220:8081/repository/maven-releases/</url>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>maven-local</id>
+			<name>Maven local repository</name>
+			<url>http://10.5.133.220:8081/repository/maven-central/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+
+	<!-- upload the component to maven local repository when run mvn depoly -->
+	<distributionManagement>
+		<repository>
+			<id>maven-local-releases</id>
+			<name>Maven Local Release Repository</name>
+			<url>http://10.5.133.220:8081/repository/maven-releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>maven-local-snapshots</id>
+			<name>Maven Local Snapshot Repository</name>
+			<url>http://10.5.133.220:8081/repository/maven-snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
 
 </project>

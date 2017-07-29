@@ -26,7 +26,7 @@ import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
+import com.byd.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
