@@ -12,7 +12,7 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import com.byd5.ats.protocol.ats_ci.AppDataCIStatus;
+import com.byd.ats.protocol.ats_ci.AppDataCIStatus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;

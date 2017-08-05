@@ -12,7 +12,7 @@ import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
-import com.byd5.ats.protocol.ats_vobc.FrameATOStatus;
+import com.byd.ats.protocol.ats_vobc.FrameATOStatus;
 
 /**
  * 列车运行任务处理类

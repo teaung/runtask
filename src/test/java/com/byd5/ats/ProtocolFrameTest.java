@@ -14,12 +14,12 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import com.byd5.ats.protocol.AppProtocolConstant;
-import com.byd5.ats.protocol.ats_ci.AppDataCIStatus;
-import com.byd5.ats.protocol.ats_ci.FrameCIStatus;
-import com.byd5.ats.protocol.ats_vobc.FrameATOStatus;
-import com.byd5.ats.protocol.ats_vobc.FrameTrainStatus;
-import com.byd5.ats.protocol.ats_zc.FrameZCTSRStatus;
+import com.byd.ats.protocol.AppProtocolConstant;
+import com.byd.ats.protocol.ats_ci.AppDataCIStatus;
+import com.byd.ats.protocol.ats_ci.FrameCIStatus;
+import com.byd.ats.protocol.ats_vobc.FrameATOStatus;
+import com.byd.ats.protocol.ats_vobc.FrameTrainStatus;
+import com.byd.ats.protocol.ats_zc.FrameZCTSRStatus;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
