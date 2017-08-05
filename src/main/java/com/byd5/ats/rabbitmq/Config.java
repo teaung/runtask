@@ -149,10 +149,6 @@ public class Config {
 		public Binding bindingATOStatus(@Qualifier("topicCU2ATS") TopicExchange ex, Queue queueATOStatus) {
 			return BindingBuilder.bind(queueATOStatus).to(ex).with(AppProtocolConstant.ROUTINGKEY_VOBC_ATO_STATUS); //"cu2ats.vobc.ato.status"
 		}
-		@Bean
-		public ReceiverATOStatus receiverATOStatus() {
-			return new ReceiverATOStatus();
-		}
 	}
 
 	//@Profile("sender")

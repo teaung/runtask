@@ -6,6 +6,8 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 import com.byd5.ats.message.AppDataATOCommand;
+import com.byd5.ats.message.AppDataDepartCommand;
+import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
@@ -36,6 +38,16 @@ public class RunTaskService {
 	public Map<Integer, TrainEventPosition> mapTrace = new HashMap<Integer, TrainEventPosition>();
 	
 	/**
+	 * 设置停站时间map：以站台ID为key，AppDataDwellTimeOrDepartCommand类为value
+	 */
+	public Map<Integer, AppDataDwellTimeCommand> mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
+	
+	/**
+	 * 设置立即发车map：以车组号为key，AppDataDwellTimeOrDepartCommand类为value
+	 */
+	public Map<Integer, AppDataDepartCommand> mapDepart = new HashMap<Integer, AppDataDepartCommand>();
+	
+	/**
 	 * 当列车到达折返时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
 	 * @param task
 	 * @return
@@ -57,7 +69,11 @@ public class RunTaskService {
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 		TrainRunTimetable first = timetableList.get(1);//第二条数据为车站数据
 		
-		cmd.setDstStationNum(task.getDstStationNum());
+		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
+		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
+		
+		cmd.setDstStationNum(endPlatformId);
+		//cmd.setDstStationNum(task.getDstStationNum());
 		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
@@ -115,7 +131,11 @@ public class RunTaskService {
 		cmd.setTrainNum((short) task.getTrainnum());
 		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
 		
-		cmd.setDstStationNum(task.getDstStationNum());
+		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
+		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
+		
+		cmd.setDstStationNum(endPlatformId);
+		//cmd.setDstStationNum(task.getDstStationNum());
 		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
 		
 		//若当前车站是终点站，则只发当前车站站停时间
@@ -150,6 +170,15 @@ public class RunTaskService {
 		cmd.setDoorControl((short) 0xFF);
 		cmd.setReserved(0);
 		
+		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+		if(mapDwellTime.containsKey(currStation.getPlatformId())){
+			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
+			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
+				cmd.setStationStopTime(timeStationStop);
+			}
+		}		
+				
 		return cmd;
 	}
 
@@ -177,7 +206,68 @@ public class RunTaskService {
 		appDataStationTiming.setStation_id(currStation.getPlatformId());
 		appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
 		
+		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+		if(mapDwellTime.containsKey(currStation.getPlatformId())){
+			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
+			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
+				appDataStationTiming.setTime(timeStationStop);
+			}
+		}		
+				
 		return appDataStationTiming;
 	}
 	
+	
+	/**
+	 * (非计划车)当列车到站(不管是否停稳)后，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向VOBC发送当前车站(默认)站停时间
+	 * @param event
+	 * @return
+	 */
+	public AppDataATOCommand appDataATOCommandEnterUnplan(TrainEventPosition event) {
+		AppDataATOCommand cmd = new AppDataATOCommand();
+
+		int platformId = event.getStation();
+
+		int timeSectionRun = 0;	//下一站区间运行时间
+		int timeStationStop = 0; // 当前车站站停时间（单位：秒）
+		
+		cmd.setServiceNum((short) 0xFFFF);
+		cmd.setLineNum((short) 64); // ??? need rungraph supply!
+		cmd.setNextZcId(0);
+		cmd.setNextCiId(0);
+		cmd.setNextAtsId(0);
+		cmd.setCarLineNum((short) 64);
+		cmd.setCarNum(event.getCarNum());
+		cmd.setSrcLineNum((short) 0xFFFF); // ??? need rungraph supply!
+		cmd.setTrainNum((short) 0000);
+		cmd.setDstLineNum((short) 64); // ??? need rungraph supply!
+		
+		cmd.setDstStationNum(String.valueOf(0xFFFFFFFF));
+		//cmd.setDstStationNum(task.getDstStationNum());
+		cmd.setDirectionPlan((short) 0xFF); // ??? need rungraph supply!
+		
+		cmd.setSkipStationId(0xFFFF);
+		cmd.setSkipNextStation((short) 0xFFFF);
+		cmd.setNextStationId(0xFFFF);
+		cmd.setStationStopTime(30); //计划站停时间（单位：秒）默认30s
+		cmd.setSectionRunLevel(2);
+		
+		cmd.setDetainCmd((short) 0);
+		cmd.setReturnCmd((short) 0);
+		cmd.setGotoRailYard((short) 0);
+		cmd.setDoorControl((short) 0xFF);
+		cmd.setReserved(0);
+		
+		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+		if(mapDwellTime.containsKey(event.getStation())){
+			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(event.getStation());
+			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
+				cmd.setStationStopTime(timeStationStop);
+			}
+		}		
+				
+		return cmd;
+	}
 }

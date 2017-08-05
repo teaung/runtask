@@ -16,19 +16,25 @@
 package com.byd5.ats.rabbitmq;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
+import org.springframework.web.client.RestTemplate;
 
 import com.byd5.ats.message.AppDataATOCommand;
+import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +52,8 @@ public class ReceiverTrace {
 	
 	@Autowired
 	private SenderDepart sender;
+	@Autowired
+	private RestTemplate restTemplate;
 	
 	/**
 	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
@@ -74,6 +82,23 @@ public class ReceiverTrace {
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
 		TrainRunTask task = null;
+		
+		short tablenum = event.getServiceNum();
+		short trainnum = event.getTrainNum();
+		
+		if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+			if(tablenum != 0){
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
+				TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+				if(newtask != null){
+					runTaskService.mapRunTask.put(carNum, newtask);
+				}else{
+					//需要发报警信息
+					LOG.error("[trace.station.arrive] get runtask error. runtask not found");
+				}
+			}
+		}
+		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);
 		}
@@ -86,10 +111,21 @@ public class ReceiverTrace {
 			runTaskService.mapTrace.replace(carNum, event);
 		}
 		
+		
+		//---------------停站时间列表为空，则查询数据库获取--------------
+		if(runTaskService.mapDwellTime.size() == 0){
+			String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+			List<AppDataDwellTimeCommand> dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+			for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
+				runTaskService.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+			}
+		}
+		
+		
 		// 向该车发送站间运行等级
 		AppDataATOCommand appDataATOCommand = null;
 
-		if (task != null) {
+		if (task != null) {//计划车
 			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
 	
 			LOG.info("[trace.station.arrive] ATOCommand: next station ["
@@ -99,8 +135,16 @@ public class ReceiverTrace {
 					+ "s]");
 			sender.sendATOCommand(appDataATOCommand);
 		}
-		else {
-			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+		else {//非计划车到站时的处理
+			appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
+			LOG.info("[trace.station.arrive] unplanTrain ATOCommand: next station ["
+					+ appDataATOCommand.getNextStationId() + "] section run time ["
+					+ appDataATOCommand.getSectionRunLevel()+ "s]"
+					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
+					+ "s]");
+			sender.sendATOCommand(appDataATOCommand);
+			
+			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
 		watch.stop();
@@ -132,6 +176,23 @@ public class ReceiverTrace {
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
 		TrainRunTask task = null;
+		
+		short tablenum = event.getServiceNum();
+		short trainnum = event.getTrainNum();
+		
+		if(runTaskService.mapRunTask.size() == 0){
+			if(tablenum != 0){
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
+				TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+				if(newtask != null){
+					runTaskService.mapRunTask.put(carNum, newtask);
+				}else{
+					//需要发报警信息
+					LOG.error("[trace.station.arrive] get runtask error. runtask not found");
+				}
+			}
+		}
+		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);
 		}

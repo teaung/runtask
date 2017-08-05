@@ -11,17 +11,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 // a. ATO命令信息帧
 typedef struct _ats2vobc_ato_command
 {
-	uint16_t  service_num;              // 服务号/表号
-	uint16_t  line_num;                 // 线路编号
+	uint16_t  service_num;              // 服务号/表号 00~65534有效 默认值：0xFFFF | 列车为非计划车时，发送默认值 |
+	uint16_t  line_num;                 // 线路编号 全网统一标识 |
 	uint32_t  next_zc_id;               // （预留）VOBC最大安全前端所在ZC管辖区域的下一个ZC ID 默认值为0xFFFFFFFF
 	uint32_t  next_ci_id;               // （预留）VOBC最大安全前端所在ci管辖区域的下一个ci ID 默认值为0xFFFFFFFF
 	uint32_t  next_ats_id;              // （预留）VOBC最大安全前端所在ats管辖区域的下一个ats ID 默认值为 0xFFFFFFFF
-	uint16_t  train_line_num;           // 车组所属线路编号
-	uint16_t  train_num;                // 车组号
+	uint16_t  train_line_num;           // 车组所属线路编号| 车组所属线路编号 | 全网统一标识 |
+	uint16_t  train_num;                // 车组号| 001~999 | “车组所属线路号”+“车组号”在全线网内为唯一标识 |
 	uint16_t  origin_line_num;          // 列车始发站线路编号 默认值 0xFFFF
-	uint16_t  train_order_num;          // 车次号
-	uint16_t  destin_line_num;          // 目的地线路编号 默认值 0xFFFF
-	uint32_t  destin_num;               // 目的地号 默认值 0xFFFFFFFF
+	uint16_t  train_order_num;          // 车次号| 0001~9999 | 默认值0000 |
+	uint16_t  destin_line_num;          // 目的地线路编号| 目的地线路编号，同线路编号 默认值：0xFFFF | 列车为非计划车时，发送默认值 |
+	uint32_t  destin_num;               // 目的地号 默认值 0xFFFFFFFF  列车为非计划车时，发送默认值
 	uint8_t   direction_plan;           // 计划运行方向  上行 0x55 下行 0xAA 其他 0xFF
 	uint16_t  cross_station_id;         // 跳停站台ID 下一站跳停：站台ID 下一站不跳停：0xFFFF
 	uint16_t  next_station_id;          // 下一停车站台ID 默认值：0xFFFF

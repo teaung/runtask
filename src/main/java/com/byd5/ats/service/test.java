@@ -20,8 +20,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
  * @author wu.xianglan
  *
  */
-/*@Component
-@Configurable
+//@Component
+/*@Configurable
 @EnableScheduling*/
 public class test{
 	
@@ -39,12 +39,13 @@ public class test{
 	String realtimeKey = "ats.traindepart.aod.command";
     //每1分钟执行一次
     //@Scheduled(cron = "0 */1 *  * * * ")
-	//@Scheduled(fixedRate = 1000)
-	public void senderAppDataStationTiming() {
+	//@Scheduled(fixedRate = 15000)
+	public void senderAppDataStationTiming() {/*
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		AppDataATOCommand appDataATOCommand = new AppDataATOCommand();
+		appDataATOCommand.setDstStationNum("6");
 		
 		String js = null;
 		try {
@@ -55,6 +56,6 @@ public class test{
 		}
 		
 		template.convertAndSend(exchangeDepart.getName(), realtimeKey, js);
-		logger.debug("[departX] " + exchangeDepart.getName() + ":" + realtimeKey + " '" + js + "'");
-	}
+		logger.info("[departX] " + exchangeDepart.getName() + ":" + realtimeKey + " '" + js + "'");
+	*/}
 }
