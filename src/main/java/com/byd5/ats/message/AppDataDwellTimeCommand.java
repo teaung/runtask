@@ -30,6 +30,15 @@ public class AppDataDwellTimeCommand {
 	@JsonProperty("setWay")
 	private int setWay;			//设置方式（0，人工设置；1，自动设置）	//停站时间时  cmdParameter:[platform_id,time,setWay] //站台ID，停站时间，设置方式（0，人工设置；1，自动设置）
 								//立即发车时  cmdParameter:[platform_id,group_mun]  //站台ID，当前站台停车的车组号
+	private short skipStationCommand = 0xAA;//下一站跳停命令（1字节）：下一站跳停=0x55；下一站无/取消跳停=0xAA；无效值=0xFF
+	
+	public short getSkipStationCommand() {
+		return skipStationCommand;
+	}
+
+	public void setSkipStationCommand(short skipStationCommand) {
+		this.skipStationCommand = skipStationCommand;
+	}
 
 	public short getClientNum() {
 		return clientNum;

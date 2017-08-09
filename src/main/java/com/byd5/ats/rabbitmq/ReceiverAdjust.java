@@ -16,6 +16,8 @@
 package com.byd5.ats.rabbitmq;
 
 import java.io.IOException;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -25,6 +27,7 @@ import org.springframework.util.StopWatch;
 import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
+import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -80,6 +83,21 @@ public class ReceiverAdjust {
 		AppDataATOCommand appDataATOCommand = null;
 		if(event != null){
 			appDataATOCommand = runTaskHandler.appDataATOCommandEnter(adjustTask, event);
+			
+			//----------------------计划离站时间有改动----------------
+			int platformId = event.getStation();
+			TrainRunTimetable currStation = null;
+			List<TrainRunTimetable> timetableList = adjustTask.getTrainRunTimetable();
+			for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+				TrainRunTimetable t = timetableList.get(i);
+				if (t.getPlatformId() == platformId) {
+					currStation = t;
+				}
+			}
+			int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
+			appDataATOCommand.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
+			//------------------------------------------------------
+			
 			sender.sendATOCommand(appDataATOCommand);
 			
 			LOG.info("[adjust] ATOCommand: next station ["

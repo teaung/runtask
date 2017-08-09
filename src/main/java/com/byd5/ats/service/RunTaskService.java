@@ -80,8 +80,17 @@ public class RunTaskService {
 		cmd.setNextStationId(first.getPlatformId());
 		cmd.setStationStopTime(0xFFFF); //计划站停时间（单位：秒）
 		cmd.setSkipStationId(0xFFFF);
-		cmd.setSkipNextStation((short) 0xFF);
+		cmd.setSkipNextStation((short) 0xAA);
 		cmd.setSectionRunLevel(0xFFFF);
+		
+		//判断是否人工设置跳停命令
+		if(mapDwellTime.containsKey(first.getPlatformId())){
+			if(mapDwellTime.get(first.getPlatformId()).getSkipStationCommand() == 0x55){
+				cmd.setSkipStationId(first.getPlatformId());
+				cmd.setSkipNextStation((short) 0x55);
+				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
+			}
+		}
 		
 		cmd.setDetainCmd((short) 0);
 		cmd.setReturnCmd((short) 0);
@@ -139,12 +148,13 @@ public class RunTaskService {
 		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
 		
 		//若当前车站是终点站，则只发当前车站站停时间
-		if(currStation.getPlatformId() == 6){
+		if(currStation.getPlatformId() == 8){
 			cmd.setSkipStationId(0xFFFF);
-			cmd.setSkipNextStation((short) 0xFF);
+			cmd.setSkipNextStation((short) 0xAA);
 			cmd.setNextStationId(0xFFFF);
 			cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
-			cmd.setSectionRunLevel(2);
+			cmd.setSectionRunLevel(timeSectionRun);
+			//cmd.setSectionRunLevel(2);
 		}
 		//若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间
 		else{
@@ -157,7 +167,7 @@ public class RunTaskService {
 			}
 			else {
 				cmd.setSkipStationId(0xFFFF);
-				cmd.setSkipNextStation((short) 0xFF);
+				cmd.setSkipNextStation((short) 0xAA);
 			}		
 					
 			// 区间运行等级/区间运行时间
@@ -176,6 +186,15 @@ public class RunTaskService {
 			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
 				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
 				cmd.setStationStopTime(timeStationStop);
+			}
+		}		
+				
+		//判断是否人工设置跳停命令
+		if(mapDwellTime.containsKey(nextStation.getPlatformId())){
+			if(mapDwellTime.get(nextStation.getPlatformId()).getSkipStationCommand() == 0x55){
+				cmd.setSkipStationId(nextStation.getPlatformId());
+				cmd.setSkipNextStation((short) 0x55);
+				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
 			}
 		}		
 				
@@ -214,6 +233,13 @@ public class RunTaskService {
 				appDataStationTiming.setTime(timeStationStop);
 			}
 		}		
+		
+		if(mapDwellTime.containsKey(currStation.getPlatformId())){
+			if(mapDwellTime.get(currStation.getPlatformId()).getSkipStationCommand() == 0x55){
+				timeStationStop = 0x0001;//设置停站时间
+				appDataStationTiming.setTime(timeStationStop);; //计划站停时间（单位：秒）
+			}
+		}
 				
 		return appDataStationTiming;
 	}
@@ -248,7 +274,7 @@ public class RunTaskService {
 		cmd.setDirectionPlan((short) 0xFF); // ??? need rungraph supply!
 		
 		cmd.setSkipStationId(0xFFFF);
-		cmd.setSkipNextStation((short) 0xFFFF);
+		cmd.setSkipNextStation((short) 0xAA);
 		cmd.setNextStationId(0xFFFF);
 		cmd.setStationStopTime(30); //计划站停时间（单位：秒）默认30s
 		cmd.setSectionRunLevel(2);

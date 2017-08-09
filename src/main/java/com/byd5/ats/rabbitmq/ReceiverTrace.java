@@ -94,7 +94,7 @@ public class ReceiverTrace {
 					runTaskService.mapRunTask.put(carNum, newtask);
 				}else{
 					//需要发报警信息
-					LOG.error("[trace.station.arrive] get runtask error. runtask not found");
+					LOG.error("[trace.station.enter] get runtask error. runtask not found");
 				}
 			}
 		}
@@ -128,7 +128,7 @@ public class ReceiverTrace {
 		if (task != null) {//计划车
 			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
 	
-			LOG.info("[trace.station.arrive] ATOCommand: next station ["
+			LOG.info("[trace.station.enter] ATOCommand: next station ["
 					+ appDataATOCommand.getNextStationId() + "] section run time ["
 					+ appDataATOCommand.getSectionRunLevel()+ "s]"
 					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
@@ -136,19 +136,20 @@ public class ReceiverTrace {
 			sender.sendATOCommand(appDataATOCommand);
 		}
 		else {//非计划车到站时的处理
-			appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
+			LOG.info("[trace.station.enter] unplanTrain----");
+			/*appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
 			LOG.info("[trace.station.arrive] unplanTrain ATOCommand: next station ["
 					+ appDataATOCommand.getNextStationId() + "] section run time ["
 					+ appDataATOCommand.getSectionRunLevel()+ "s]"
 					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
 					+ "s]");
-			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataATOCommand);*/
 			
 			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
 		watch.stop();
-		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 
 	/**
@@ -177,6 +178,14 @@ public class ReceiverTrace {
 		Integer carNum = (int) event.getCarNum();
 		TrainRunTask task = null;
 		
+		//添加列车到站信息
+		if (!runTaskService.mapTrace.containsKey(carNum)) {
+			runTaskService.mapTrace.put(carNum, event);
+		}
+		else {
+			runTaskService.mapTrace.replace(carNum, event);
+		}		
+				
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
 		

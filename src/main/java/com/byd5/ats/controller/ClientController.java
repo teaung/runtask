@@ -92,7 +92,7 @@ public class ClientController{
 				//----------------更新数据库停站时间命令，并更新map列表------------------
 				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(dwellTimeCommand));
 				if(resultMsg == null){
-					LOG.error("[appDataDepartCommand] save error Or parse error." );
+					LOG.error("[appDatadwellTimeCommand] save error Or parse error." );
 				}else{
 					dwellTimeCommand = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
 					//dwellTimeCommand = (AppDataDwellTimeCommand) mapData.get("commandData");
@@ -199,6 +199,56 @@ public class ClientController{
 		mapData.put("ats_station_stop_time", dwellTimeDataList);
 		result = mapper.writeValueAsString(mapData);
 		
+		//LOG.info("---[S]--getRuntaskAllCommand--"+result);
+		return result;
+
+	}
+	
+	
+	@RequestMapping(value = "/setSkipStationCommand")
+	public @ResponseBody String setSkipStationCommand(Integer skipStationId, short skipStationCommand) throws JsonParseException, JsonMappingException, IOException{
+		String result = null;
+		ObjectMapper mapper = new ObjectMapper();
+		Map<String, Object> mapData = new HashMap<String, Object>();
+		System.out.println(skipStationId+"-----skipStationCommand:"+skipStationCommand);
+		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		//LOG.info("---[R]--getRuntaskAllCommand--");
+		try{
+			//---------------命令列表为空，则查询数据库获取--------------
+			if(runTaskHandler.mapDwellTime.size() == 0){
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				mapData = new HashMap<String, Object>();
+				List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+				for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
+					runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+				}
+			}
+			
+			if(runTaskHandler.mapDwellTime.containsKey(skipStationId)){
+				AppDataDwellTimeCommand command = runTaskHandler.mapDwellTime.get(skipStationId);
+				command.setSkipStationCommand(skipStationCommand);
+				runTaskHandler.mapDwellTime.replace(skipStationId, command);
+				
+				//----------------更新数据库跳停命令，并更新map列表------------------
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(command));
+				if(resultMsg == null){
+					LOG.error("[setSkipStationCommand] save error Or parse error." );
+				}else{
+					command = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
+					runTaskHandler.mapDwellTime.replace(skipStationId, command);
+				}
+				
+			}else{
+				LOG.error("[setSkipStationCommand] not find the sikp platformId");
+			}
+			
+			
+		}catch (Exception e) {
+			// TODO: handle exception
+			e.printStackTrace();
+			LOG.error("[setSkipStationCommand] parse data error.");
+		}
+				
 		//LOG.info("---[S]--getRuntaskAllCommand--"+result);
 		return result;
 
