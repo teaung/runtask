@@ -11,6 +11,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,17 +67,24 @@ public class ClientController{
 			if(runtaskCmdType == 114){//停站时间
 				AppDataDwellTimeCommand dwellTimeCommand = mapper.readValue(json, AppDataDwellTimeCommand.class);
 				Integer platform = dwellTimeCommand.getPlatformId();//站台ID
-				Map mapData = new HashMap();
 				
 				//---------------停站时间列表为空，则查询数据库获取--------------
 				if(runTaskHandler.mapDwellTime.size() == 0){
-					//mapData.put("messageType", "getRuntaskAllCommand");
-					String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-					mapData = new HashMap<String, Object>();
-					List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
-					//List<AppDataDwellTimeCommand> dataList = (List<AppDataDwellTimeCommand>) mapData.get("commandData");
-					for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
-						runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+					try{
+						String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+						if(resultMsg != null){
+							List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+							for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
+								runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+							}
+						}else{
+							LOG.error("[setDwellTime] serv31-trainrungraph fallback runtask is null!");
+						}
+						
+					}catch (Exception e) {
+						// TODO: handle exception
+						LOG.error("[setDwellTime] serv31-trainrungraph can't connetc, or runtask parse error!");
+						e.printStackTrace();
 					}
 				}
 				
@@ -92,7 +100,7 @@ public class ClientController{
 				//----------------更新数据库停站时间命令，并更新map列表------------------
 				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(dwellTimeCommand));
 				if(resultMsg == null){
-					LOG.error("[appDatadwellTimeCommand] save error Or parse error." );
+					LOG.error("[setDwellTime] save error Or parse error." );
 				}else{
 					dwellTimeCommand = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
 					//dwellTimeCommand = (AppDataDwellTimeCommand) mapData.get("commandData");
@@ -106,65 +114,13 @@ public class ClientController{
 				result = mapper.writeValueAsString(map);
 			}
 			
-			if(runtaskCmdType == 104){//立即发车
-				AppDataDepartCommand departCommand = mapper.readValue(json, AppDataDepartCommand.class);
-				// 检查该车是否有记录
-				Integer platformId = departCommand.getPlatformId();
-				Integer carNum = departCommand.getGroupNum();
-				TrainRunTask task = null;
-				if (runTaskHandler.mapRunTask.containsKey(carNum)) {
-					task = runTaskHandler.mapRunTask.get(carNum);
-				}
-				TrainEventPosition event = null;
-				if (runTaskHandler.mapTrace.containsKey(carNum)) {
-					event = runTaskHandler.mapTrace.get(carNum);
-				}
-				
-				// 向该车发送站间运行等级
-				AppDataATOCommand appDataATOCommand = null;
-				AppDataStationTiming appDataStationTiming = null;
-
-				if (task != null && event != null && event.getStation() == platformId) {
-					//-------------------给车发AOD命令(停站时间0)----------------
-					appDataATOCommand = runTaskHandler.appDataATOCommandEnter(task, event);
-					appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
-			
-					LOG.info("[appDataDepartCommand] ATOCommand: next station ["
-							+ appDataATOCommand.getNextStationId() + "] section run time ["
-							+ appDataATOCommand.getSectionRunLevel()+ "s]"
-							+ "section stop time ["+ appDataATOCommand.getStationStopTime()
-							+ "s]");
-					sender.sendATOCommand(appDataATOCommand);
-					
-					//-------------------给客户端发停站时间0----------------
-					appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
-					appDataStationTiming.setTime(0x0001);
-					
-					LOG.info("[appDataDepartCommand] AppDataTimeStationStop: this station ["
-							+ appDataStationTiming.getStation_id() + "] section stop time ["
-							+ appDataStationTiming.getTime()
-							+ "s]");
-					sender.senderAppDataStationTiming(appDataStationTiming);
-					
-					BackDepart2AppData BackDepart2AppData = new BackDepart2AppData(runtaskCmdType, true, "设置成功", platformId);
-					map.put("tgi_msg", BackDepart2AppData);
-					result = mapper.writeValueAsString(map);
-				}
-				else {
-					LOG.info("[appDataDepartCommand] not find the car (" + carNum + ") in runTask list, so do nothing.");
-					BackDepart2AppData BackDepart2AppData = new BackDepart2AppData(runtaskCmdType, false, "设置失败", platformId);
-					map.put("tgi_msg", BackDepart2AppData);
-					result = mapper.writeValueAsString(map);
-				}
-			}
-			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			LOG.error("[dwellTimeOrDepartCommand] parse data error.");
+			LOG.error("[setDwellTime] parse data error.");
 			e.printStackTrace();
 		}
 		
-		LOG.info("--sender--" + result);
+		LOG.info("[setDwellTime]--sender--" + result);
 		return result;
 	}
 
@@ -182,10 +138,29 @@ public class ClientController{
 		//LOG.info("---[R]--getRuntaskAllCommand--");
 		List<DwellTimeData> dwellTimeDataList = new ArrayList<DwellTimeData>();
 		try{
-			String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-			List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+			if(runTaskHandler.mapDwellTime == null || runTaskHandler.mapDwellTime.size() == 0){
+				runTaskHandler.mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
+				System.out.println("----------------");
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				try{
+					if(resultMsg != null){
+						List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+						for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
+							runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+						}
+					}else{
+						LOG.error("getRuntaskAllCommand fail, or getRuntaskAllCommand is null!");
+					}
+				}catch (Exception e) {
+					// TODO: handle exception
+					LOG.error("fallback data parse error!");
+					e.printStackTrace();
+				}
+			}
+			//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+			//List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
 
-			for(AppDataDwellTimeCommand dwellTimeCommand:dataList){
+			for(AppDataDwellTimeCommand dwellTimeCommand:runTaskHandler.mapDwellTime.values()){
 				DwellTimeData dwellTimeData = new DwellTimeData();
 				BeanUtils.copyProperties(dwellTimeCommand, dwellTimeData);
 				dwellTimeDataList.add(dwellTimeData);
@@ -204,53 +179,121 @@ public class ClientController{
 
 	}
 	
-	
+	/**
+	 * 设置立即发车
+	 * @param platformId
+	 * @param carNum
+	 * @return
+	 * @throws JsonParseException
+	 * @throws JsonMappingException
+	 * @throws IOException
+	 */
 	@RequestMapping(value = "/setSkipStationCommand")
-	public @ResponseBody String setSkipStationCommand(Integer skipStationId, short skipStationCommand) throws JsonParseException, JsonMappingException, IOException{
-		String result = null;
-		ObjectMapper mapper = new ObjectMapper();
-		Map<String, Object> mapData = new HashMap<String, Object>();
-		System.out.println(skipStationId+"-----skipStationCommand:"+skipStationCommand);
-		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-		//LOG.info("---[R]--getRuntaskAllCommand--");
+	public @ResponseBody String departCommand(Integer platformId, Integer carNum) throws JsonParseException, JsonMappingException, IOException{
+		String result = "0";
+		LOG.info("---[S]--setDepartCommand--platformId:"+platformId+" carNum:"+carNum);
 		try{
-			//---------------命令列表为空，则查询数据库获取--------------
-			if(runTaskHandler.mapDwellTime.size() == 0){
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-				mapData = new HashMap<String, Object>();
-				List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
-				for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
-					runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
-				}
+			// 检查该车是否有记录
+			TrainEventPosition event = null;
+			if (runTaskHandler.mapTrace.containsKey(carNum)) {
+				event = runTaskHandler.mapTrace.get(carNum);
 			}
 			
-			if(runTaskHandler.mapDwellTime.containsKey(skipStationId)){
-				AppDataDwellTimeCommand command = runTaskHandler.mapDwellTime.get(skipStationId);
-				command.setSkipStationCommand(skipStationCommand);
-				runTaskHandler.mapDwellTime.replace(skipStationId, command);
-				
-				//----------------更新数据库跳停命令，并更新map列表------------------
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(command));
-				if(resultMsg == null){
-					LOG.error("[setSkipStationCommand] save error Or parse error." );
-				}else{
-					command = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
-					runTaskHandler.mapDwellTime.replace(skipStationId, command);
+			if(event != null && runTaskHandler.mapRunTask.size() == 0){
+				ObjectMapper objMapper = new ObjectMapper();
+				String resultMsg = null;
+				try{
+					resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, event.getServiceNum(), event.getTrainNum());
+					try{
+						if(resultMsg != null){
+							TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+							if(newtask != null){
+								runTaskHandler.mapRunTask.put(carNum, newtask);
+							}/*else{
+								//需要发报警信息
+								LOG.error("get runtask error. runtask not found");
+							}*/
+						}
+						else{
+							LOG.error("[setDepartCommand] getRuntask fail, or getRuntask is null!");
+						}
+					}catch (Exception e) {
+						// TODO: handle exception
+						LOG.error("[setDepartCommand] fallback data parse error!");
+						e.printStackTrace();
+					}
+				}catch (Exception e) {
+					// TODO: handle exception
+					LOG.error("[serv31-trainrungraph] can't connection!");
+					e.printStackTrace();
 				}
 				
-			}else{
-				LOG.error("[setSkipStationCommand] not find the sikp platformId");
 			}
 			
+			TrainRunTask task = null;
+			if (runTaskHandler.mapRunTask.containsKey(carNum)) {
+				task = runTaskHandler.mapRunTask.get(carNum);
+			}
+			
+			// 向该车发送站间运行等级
+			AppDataATOCommand appDataATOCommand = null;
+			AppDataStationTiming appDataStationTiming = null;
+
+			if (task != null && event != null && event.getStation() == platformId) {
+				//-------------------给车发AOD命令(停站时间0)----------------
+				appDataATOCommand = runTaskHandler.appDataATOCommandEnter(task, event);
+				appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
+		
+				//-------------------给客户端发停站时间0----------------
+				appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
+				appDataStationTiming.setTime(0x0001);
+			}
+			else {
+				//LOG.info("[appDataDepartCommand] not find the car (" + carNum + ") in runTask list, so do nothing.");
+				//result = "0";
+				LOG.info("[setDepartCommand] unplanTrain----");
+				
+				//-------------------给车发AOD命令(停站时间0)----------------
+				appDataATOCommand = runTaskHandler.appDataATOCommandEnterUnplan(event);
+				appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
+		
+				//-------------------给客户端发停站时间0----------------
+				appDataStationTiming = runTaskHandler.appDataStationTimingUnplan(event);
+				appDataStationTiming.setTime(0x0001);
+			}
+			
+			//---------------发送消息--------------------------
+			LOG.info("[setDepartCommand] ATOCommand: next station ["
+					+ appDataATOCommand.getNextStationId() + "] section run time ["
+					+ appDataATOCommand.getSectionRunLevel()+ "s]"
+					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
+					+ "s]");
+			sender.sendATOCommand(appDataATOCommand);
+			
+			LOG.info("[setDepartCommand] AppDataTimeStationStop: this station ["
+					+ appDataStationTiming.getStation_id() + "] section stop time ["
+					+ appDataStationTiming.getTime()
+					+ "s]");
+			sender.senderAppDataStationTiming(appDataStationTiming);
+			result = "1";
 			
 		}catch (Exception e) {
 			// TODO: handle exception
+			LOG.error("setDepartCommand error!");
 			e.printStackTrace();
-			LOG.error("[setSkipStationCommand] parse data error.");
+			result = "0";
 		}
-				
-		//LOG.info("---[S]--getRuntaskAllCommand--"+result);
+		LOG.info("---[S]--setDepartCommand--result:"+result);		
 		return result;
 
+	}
+	
+	@RequestMapping(value="/test", method=RequestMethod.GET)
+	public @ResponseBody Integer getSkipStationStatus(@RequestParam Integer platformId) throws JsonParseException, JsonMappingException, IOException{
+		String skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, platformId);
+		System.out.println("-------skipStatusStr--------"+skipStatusStr);
+		Integer skipStatus = Integer.getInteger(skipStatusStr);
+		System.out.println("-------skipStatus--------"+skipStatus);
+		return skipStatus;
 	}
 }

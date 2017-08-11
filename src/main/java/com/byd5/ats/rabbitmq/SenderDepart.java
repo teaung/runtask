@@ -17,6 +17,8 @@ package com.byd5.ats.rabbitmq;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -115,10 +117,16 @@ public class SenderDepart {
 	public void senderAppDataStationTiming(AppDataStationTiming appDataStationTiming) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
-		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+		//objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		
 		String js = null;
-		js = objMapper.writeValueAsString(appDataStationTiming);
+		
+		Map<String, Object> map = new HashMap<String, Object>();
+		map.put("ats_station_timing", appDataStationTiming);
+		js = objMapper.writeValueAsString(map);
+		
+		
+		//js = objMapper.writeValueAsString(appDataStationTiming);
 		
 		template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
 		LOG.info("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");

@@ -15,23 +15,16 @@
  */
 package com.byd5.ats.rabbitmq;
 
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-
 import com.byd5.ats.message.AppDataATOCommand;
+import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
-import com.byd.ats.protocol.ats_ci.FrameCIStatus;
-import com.byd.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -66,27 +59,67 @@ public class ReceiverRungraph {
 		//反序列化
 		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
-		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-		
-		task = objMapper.readValue(in, TrainRunTask.class);
-		
-		// 添加运行任务列表
-		//runTaskHandler.runTaskList.add(task);
-		Integer carNum = task.getTraingroupnum();
-		if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
-			runTaskHandler.mapRunTask.put(carNum, task);
+		//objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		try{
+			task = objMapper.readValue(in, TrainRunTask.class);
+			
+			// 添加运行任务列表
+			//runTaskHandler.runTaskList.add(task);
+			Integer carNum = task.getTraingroupnum();
+			if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
+				runTaskHandler.mapRunTask.put(carNum, task);
+			}
+			else {
+				runTaskHandler.mapRunTask.replace(carNum, task);
+			}
+			
+			// 向该车发送表号、车次号
+			AppDataATOCommand appDataATOCommand = null;
+			appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);
+			
+			sender.sendATOCommand(appDataATOCommand);
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[rungraph runtask] parse data error!");
 		}
-		else {
-			runTaskHandler.mapRunTask.replace(carNum, task);
-		}
 		
-		// 向该车发送表号、车次号
-		AppDataATOCommand appDataATOCommand = null;
-		appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);
-		
-		sender.sendATOCommand(appDataATOCommand);
 		
 		watch.stop();
 		System.out.println("[rungraph] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
+	
+	/**
+	 * 列车出入段时，表号、车次号、车组号信息
+	 * @param in
+	 * @throws Exception
+	 */
+	@RabbitListener(queues = "#{queueRungraphRunInfo.name}")
+	public void receiveRungraphRunInfo(String in) throws Exception {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[rungraph RunInfo] '" + in + "'");
+		
+		
+		ObjectMapper objMapper = new ObjectMapper();
+		
+		//objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		try{
+			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
+			
+			// 向该车发送表号、车次号
+			AppDataATOCommand appDataATOCommand = null;
+			appDataATOCommand = runTaskHandler.appDataATOCommandTask(trainRunInfo);
+			
+			sender.sendATOCommand(appDataATOCommand);
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[rungraph RunInfo] parse data error!");
+		}
+		
+		
+		watch.stop();
+		LOG.info("[rungraph RunInfo] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
+	
 }

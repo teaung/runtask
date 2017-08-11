@@ -94,6 +94,11 @@ public class Config {
 		}
 		
 		@Bean
+		public Queue queueRungraphRunInfo() {
+			return new AnonymousQueue();
+		}
+		
+		@Bean
 		public Queue queueAdjust() {
 			return new AnonymousQueue();
 		}
@@ -106,6 +111,11 @@ public class Config {
 		@Bean
 		public Binding bindingRungraph(@Qualifier("exchangeRungraph") TopicExchange ex, Queue queueRungraph) {
 			return BindingBuilder.bind(queueRungraph).to(ex).with("ats.trainrungraph.task");
+		}
+		
+		@Bean
+		public Binding bindingRungraphRunInfo(@Qualifier("exchangeRungraph") TopicExchange ex, Queue queueRungraphRunInfo) {
+			return BindingBuilder.bind(queueRungraphRunInfo).to(ex).with("ats.trainrungraph.runOutgarage");
 		}
 		
 		@Bean

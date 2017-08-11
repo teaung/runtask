@@ -18,6 +18,7 @@ package com.byd5.ats.rabbitmq;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,14 +89,21 @@ public class ReceiverTrace {
 		
 		if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
 			if(tablenum != 0){
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-				TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-				if(newtask != null){
-					runTaskService.mapRunTask.put(carNum, newtask);
-				}else{
-					//需要发报警信息
-					LOG.error("[trace.station.enter] get runtask error. runtask not found");
+				try{
+					String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
+					if(resultMsg != null){
+						TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+						runTaskService.mapRunTask.put(carNum, newtask);
+					}else{
+						//需要发报警信息
+						LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+					}
+				}catch (Exception e) {
+					// TODO: handle exception
+					LOG.error("[trace.station.enter] serv31-trainrungraph can't connetc, or runtask parse error!");
+					e.printStackTrace();
 				}
+				
 			}
 		}
 		
@@ -114,11 +122,23 @@ public class ReceiverTrace {
 		
 		//---------------停站时间列表为空，则查询数据库获取--------------
 		if(runTaskService.mapDwellTime.size() == 0){
-			String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-			List<AppDataDwellTimeCommand> dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
-			for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
-				runTaskService.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+			try{
+				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				if(resultMsg != null){
+					List<AppDataDwellTimeCommand> dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
+					for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
+						runTaskService.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
+					}
+				}else{
+					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+				}
+				
+			}catch (Exception e) {
+				// TODO: handle exception
+				LOG.error("[trace.station.enter] serv31-trainrungraph can't connetc, or runtask parse error!");
+				e.printStackTrace();
 			}
+			
 		}
 		
 		
@@ -128,25 +148,26 @@ public class ReceiverTrace {
 		if (task != null) {//计划车
 			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
 	
-			LOG.info("[trace.station.enter] ATOCommand: next station ["
-					+ appDataATOCommand.getNextStationId() + "] section run time ["
-					+ appDataATOCommand.getSectionRunLevel()+ "s]"
-					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
-					+ "s]");
-			sender.sendATOCommand(appDataATOCommand);
 		}
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
-			/*appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
-			LOG.info("[trace.station.arrive] unplanTrain ATOCommand: next station ["
-					+ appDataATOCommand.getNextStationId() + "] section run time ["
-					+ appDataATOCommand.getSectionRunLevel()+ "s]"
-					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
-					+ "s]");
-			sender.sendATOCommand(appDataATOCommand);*/
+			appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
 			
 			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
+		
+		LOG.info("[trace.station.enter] ATOCommand: next station ["
+				+ appDataATOCommand.getNextStationId() + "] section run time ["
+				+ appDataATOCommand.getSectionRunLevel()+ "s]"
+				+ "section stop time ["+ appDataATOCommand.getStationStopTime()
+				+ "s]");
+		
+		
+		if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataATOCommand);
+		}
+		sender.sendATOCommand(appDataATOCommand);
 		
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -191,13 +212,19 @@ public class ReceiverTrace {
 		
 		if(runTaskService.mapRunTask.size() == 0){
 			if(tablenum != 0){
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-				TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-				if(newtask != null){
-					runTaskService.mapRunTask.put(carNum, newtask);
-				}else{
-					//需要发报警信息
-					LOG.error("[trace.station.arrive] get runtask error. runtask not found");
+				try{
+					String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
+					if(resultMsg != null){
+						TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+						runTaskService.mapRunTask.put(carNum, newtask);
+					}else{
+						//需要发报警信息
+						LOG.error("[trace.station.arrive] serv31-trainrungraph fallback runtask is null!");
+					}
+				}catch (Exception e) {
+					// TODO: handle exception
+					LOG.error("[trace.station.arrive] serv31-trainrungraph can't connetc, or runtask parse error!");
+					e.printStackTrace();
 				}
 			}
 		}
@@ -206,21 +233,33 @@ public class ReceiverTrace {
 			task = runTaskService.mapRunTask.get(carNum);
 		}
 		
+		//添加列车到站信息
+		if (!runTaskService.mapTrace.containsKey(carNum)) {
+			runTaskService.mapTrace.put(carNum, event);
+		}
+		else {
+			runTaskService.mapTrace.replace(carNum, event);
+		}		
+		
 		// 向客户端发送站停时间
 		AppDataStationTiming appDataStationTiming = null;
 
 		if (task != null) {
 			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
-	
-			LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
-					+ appDataStationTiming.getStation_id() + "] section stop time ["
-					+ appDataStationTiming.getTime()
-					+ "s]");
-			sender.senderAppDataStationTiming(appDataStationTiming);
 		}
 		else {
-			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			LOG.info("[trace.station.arrive] unplanTrain----");
+			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+
+			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}		
+		
+		LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
+				+ appDataStationTiming.getStation_id() + "] section stop time ["
+				+ appDataStationTiming.getTime()
+				+ "s]");
+		
+		sender.senderAppDataStationTiming(appDataStationTiming);
 		
 		watch.stop();
 		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
