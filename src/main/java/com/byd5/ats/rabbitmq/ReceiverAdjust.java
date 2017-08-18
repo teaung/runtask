@@ -95,7 +95,7 @@ public class ReceiverAdjust {
 				}
 			}
 			int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
-			appDataATOCommand.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
+			appDataATOCommand.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
 			//------------------------------------------------------
 			
 			sender.sendATOCommand(appDataATOCommand);
@@ -107,6 +107,7 @@ public class ReceiverAdjust {
 					+ "s]");
 		}
 		else {
+			//报警？？？
 			LOG.info("[adjust] not find the car (" + carNum + ") in trace list, so do nothing.");
 		}
 		

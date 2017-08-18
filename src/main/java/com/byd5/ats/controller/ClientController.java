@@ -17,10 +17,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import com.byd5.ats.message.AppDataATOCommand;
-import com.byd5.ats.message.AppDataDepartCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
-import com.byd5.ats.message.BackDepart2AppData;
 import com.byd5.ats.message.BackDwellTime2AppData;
 import com.byd5.ats.message.DwellTimeData;
 import com.byd5.ats.message.TrainEventPosition;
@@ -139,7 +137,7 @@ public class ClientController{
 		List<DwellTimeData> dwellTimeDataList = new ArrayList<DwellTimeData>();
 		try{
 			if(runTaskHandler.mapDwellTime == null || runTaskHandler.mapDwellTime.size() == 0){
-				runTaskHandler.mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
+				//runTaskHandler.mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
 				System.out.println("----------------");
 				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
 				try{
@@ -242,25 +240,24 @@ public class ClientController{
 			if (task != null && event != null && event.getStation() == platformId) {
 				//-------------------给车发AOD命令(停站时间0)----------------
 				appDataATOCommand = runTaskHandler.appDataATOCommandEnter(task, event);
-				appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
 		
 				//-------------------给客户端发停站时间0----------------
 				appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
-				appDataStationTiming.setTime(0x0001);
 			}
 			else {
 				//LOG.info("[appDataDepartCommand] not find the car (" + carNum + ") in runTask list, so do nothing.");
 				//result = "0";
-				LOG.info("[setDepartCommand] unplanTrain----");
+				LOG.info("[setDepartCommand] -------------unplanTrain-----------");
 				
 				//-------------------给车发AOD命令(停站时间0)----------------
 				appDataATOCommand = runTaskHandler.appDataATOCommandEnterUnplan(event);
-				appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
 		
 				//-------------------给客户端发停站时间0----------------
 				appDataStationTiming = runTaskHandler.appDataStationTimingUnplan(event);
-				appDataStationTiming.setTime(0x0001);
 			}
+			
+			appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
+			appDataStationTiming.setTime(0x0001);
 			
 			//---------------发送消息--------------------------
 			LOG.info("[setDepartCommand] ATOCommand: next station ["
@@ -295,5 +292,59 @@ public class ClientController{
 		Integer skipStatus = Integer.getInteger(skipStatusStr);
 		System.out.println("-------skipStatus--------"+skipStatus);
 		return skipStatus;
+	}
+	
+	@RequestMapping(value="/test1", method=RequestMethod.GET)
+	public @ResponseBody String trainrungraph() throws JsonParseException, JsonMappingException, IOException{
+		String resultMsg = null;
+		ObjectMapper mapper = new ObjectMapper();
+		try{
+			resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, 101, 1, 102);
+			if(resultMsg != null){
+				TrainRunTask newtask = mapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+				runTaskHandler.mapRunTask.put(101, newtask);
+				LOG.error("[getRuntask] "+resultMsg);
+			}else{
+				//需要发报警信息
+				LOG.error("[getRuntask] serv31-trainrungraph fallback runtask is null!");
+			}
+			
+			resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, 102, 1, 103);
+			if(resultMsg != null){
+				TrainRunTask newtask = mapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+				runTaskHandler.mapRunTask.put(102, newtask);
+				LOG.error("[getRuntask] "+resultMsg);
+			}else{
+				//需要发报警信息
+				LOG.error("[getRuntask] serv31-trainrungraph fallback runtask is null!");
+			}
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[getRuntask] serv31-trainrungraph can't connetc, or runtask parse error!");
+			e.printStackTrace();
+		}
+		return resultMsg;
+	}
+	
+	
+	@RequestMapping(value="/getAlltrainruntask", method=RequestMethod.GET)
+	public @ResponseBody String getAlltrainruntask() throws JsonParseException, JsonMappingException, IOException{
+		String resultMsg = null;
+		try{
+			List<TrainRunTask> json = new ArrayList<TrainRunTask>();
+			ObjectMapper mapper = new ObjectMapper();
+			Map<Integer, TrainRunTask> allRuntask = runTaskHandler.mapRunTask;
+			for(TrainRunTask TrainRunTask:allRuntask.values()){
+				json.add(TrainRunTask);
+			}
+			resultMsg = mapper.writeValueAsString(json);
+			
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[getAlltrainruntask] Exception!");
+			e.printStackTrace();
+		}
+		LOG.info("[getAlltrainruntask] sender to PS data: "+resultMsg);
+		return resultMsg;
 	}
 }

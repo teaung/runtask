@@ -78,7 +78,7 @@ public class SenderDepart {
 
 	public void sendDepart(TrainRunTimetable table) throws JsonProcessingException {
 		
-		table.servTag = this.tag;
+		//table.servTag = this.tag;
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		

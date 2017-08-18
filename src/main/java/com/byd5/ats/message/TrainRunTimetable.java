@@ -17,7 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 */
 public class TrainRunTimetable {
 	
-	public String servTag = "";
+	//public String servTag = "";
 	
 	private int platformId;// 站台ID
 	private long planArriveTime;// 计划到站时间

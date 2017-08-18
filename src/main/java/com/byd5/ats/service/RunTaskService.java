@@ -11,10 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
-import com.byd5.ats.controller.ClientController;
 import com.byd5.ats.message.AppDataATOCommand;
-import com.byd5.ats.message.AppDataDepartCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
@@ -46,24 +43,14 @@ public class RunTaskService {
 	public Map<Integer, TrainRunTask> mapRunTask = new HashMap<Integer, TrainRunTask>();
 
 	/**
-	 * 列车ATO状态map：以车组号为key，FrameATOStatus类为value
-	 */
-	public Map<Integer, FrameATOStatus> mapATOStatus = new HashMap<Integer, FrameATOStatus>();
-	
-	/**
-	 * 运行任务map：以车组号为key，TrainRunTask类为value
+	 * 运行任务map：以车组号为key，TrainTrace类为value
 	 */
 	public Map<Integer, TrainEventPosition> mapTrace = new HashMap<Integer, TrainEventPosition>();
 	
 	/**
-	 * 设置停站时间map：以站台ID为key，AppDataDwellTimeOrDepartCommand类为value
+	 * 设置停站时间map：以站台ID为key，AppDataDwellTimeCommand类为value
 	 */
 	public Map<Integer, AppDataDwellTimeCommand> mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
-	
-	/**
-	 * 设置立即发车map：以车组号为key，AppDataDwellTimeOrDepartCommand类为value
-	 */
-	public Map<Integer, AppDataDepartCommand> mapDepart = new HashMap<Integer, AppDataDepartCommand>();
 	
 	/**
 	 * 当列车到达折返时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
@@ -92,7 +79,7 @@ public class RunTaskService {
 		
 		cmd.setDstStationNum(endPlatformId);
 		//cmd.setDstStationNum(task.getDstStationNum());
-		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
+		cmd.setDirectionPlan((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
 		cmd.setNextStationId(first.getPlatformId());
@@ -111,7 +98,7 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
 			e.printStackTrace();
 		}
 		
@@ -144,12 +131,11 @@ public class RunTaskService {
 		TrainRunTimetable nextStation = null;
 		int timeSectionRun = 0;	//下一站区间运行时间
 		int timeStationStop = 0; // 当前车站站停时间（单位：秒）
-		for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
 				currStation = t;
 				nextStation = timetableList.get(i+1);
-				
 			}
 		}
 		
@@ -172,16 +158,16 @@ public class RunTaskService {
 		
 		cmd.setDstStationNum(endPlatformId);
 		//cmd.setDstStationNum(task.getDstStationNum());
-		cmd.setDirectionPlan(task.getRunDirection()); // ??? need rungraph supply!
+		cmd.setDirectionPlan((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//若当前车站是终点站，则只发当前车站站停时间
-		if(currStation.getPlatformId() == 8){
+		if(currStation.getPlatformId() == lastStation.getPlatformId()){
 			cmd.setSkipStationId(0xFFFF);
 			cmd.setSkipNextStation((short) 0xAA);
 			cmd.setNextStationId(0xFFFF);
 			cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
-			cmd.setSectionRunLevel(timeSectionRun);
-			//cmd.setSectionRunLevel(2);
+			cmd.setSectionRunLevel(0xFFFF);
+			//cmd.setSectionRunLevel(timeSectionRun);
 		}
 		//若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间
 		else{
@@ -226,8 +212,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 			
 		//判断当前车站是否人工设置跳停命令
@@ -239,8 +225,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 				
 				
@@ -262,7 +248,7 @@ public class RunTaskService {
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
 		TrainRunTimetable currStation = null;
-		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+		for (int i = 0; i < timetableList.size(); i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
 				currStation = t;
@@ -292,8 +278,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 		
 				
@@ -337,8 +323,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 		
 				
@@ -372,13 +358,14 @@ public class RunTaskService {
 		
 		cmd.setDstStationNum(String.valueOf(0xFFFF));
 		//cmd.setDstStationNum(task.getDstStationNum());
-		cmd.setDirectionPlan((short) 0xFF); // ??? need rungraph supply!
+		cmd.setDirectionPlan((short) ((event.getDirectionPlan()==0)?0xAA:0x55)); 
+		//cmd.setDirectionPlan((short) 0xFF); // ??? need rungraph supply!
 		
 		cmd.setSkipStationId(0xFFFF);
 		cmd.setSkipNextStation((short) 0xAA);
 		//cmd.setNextStationId(0xFFFF);
 		cmd.setStationStopTime(30); //计划站停时间（单位：秒）默认30s
-		cmd.setSectionRunLevel(0);
+		cmd.setSectionRunLevel(0);//(0xFFFF);
 		
 		cmd.setDetainCmd((short) 0);
 		cmd.setReturnCmd((short) 0);
@@ -412,8 +399,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 		
 		//判断当前车站是否人工设置跳停命令
@@ -425,8 +412,8 @@ public class RunTaskService {
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or runtask parse error!");
-			e.printStackTrace();
+			LOG.error("serv35-traincontrol can't connect, or parse error!");
+			//e.printStackTrace();
 		}
 					
 				
@@ -474,108 +461,4 @@ public class RunTaskService {
 		return cmd;
 	}
 	
-	
-	
-	
-	/**
-	 * 获取运行图服务的运行任务
-	 * @param carNum 车组号
-	 * @param tablenum 表号
-	 * @param trainnum 车次号
-	 * @throws JsonParseException
-	 * @throws JsonMappingException
-	 * @throws IOException
-	 *//*
-	@HystrixCommand(fallbackMethod = "connectTrainrungraphError")
-	public void getRuntask(Integer carNum, short tablenum, short trainnum) throws JsonParseException, JsonMappingException, IOException{
-		ObjectMapper objMapper = new ObjectMapper();
-		String resultMsg = null;
-		resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-		try{
-			if(resultMsg != null){
-				TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-				if(newtask != null){
-					mapRunTask.put(carNum, newtask);
-				}else{
-					//需要发报警信息
-					LOG.error("get runtask error. runtask not found");
-				}
-			}
-			else{
-				LOG.error("getRuntask fail, or getRuntask is null!");
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("fallback data parse error!");
-		}
-		
-	}
-	
-	*//**
-	 * 获取列车控制服务的站台跳停状态
-	 * @param platformId 站台ID
-	 * @return
-	 * @throws JsonParseException
-	 * @throws JsonMappingException
-	 * @throws IOException
-	 *//*
-	@HystrixCommand(fallbackMethod = "connectTraincontrolError")
-	public Integer getSkipStationStatus(Integer platformId) throws JsonParseException, JsonMappingException, IOException{
-		String skipStatusStr = null;
-		skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, platformId);
-		
-		Integer skipStatus = Integer.getInteger(skipStatusStr);
-		return skipStatus;
-	}
-	
-	*//**
-	 * 获取运行图服务的所有站台停站时间
-	 * @return
-	 * @throws JsonParseException
-	 * @throws JsonMappingException
-	 * @throws IOException
-	 *//*
-	@HystrixCommand(fallbackMethod = "connectTrainrungraphError")
-	public void getDwellTimeList() throws JsonParseException, JsonMappingException, IOException{
-		ObjectMapper objMapper = new ObjectMapper();
-		String resultMsg = null;
-		List<AppDataDwellTimeCommand> dataList = new ArrayList<AppDataDwellTimeCommand>();
-		
-			resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-			try{
-				if(resultMsg != null){
-					dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
-					for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
-						mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
-					}
-				}else{
-					LOG.error("getRuntaskAllCommand fail, or getRuntaskAllCommand is null!");
-				}
-			}catch (Exception e) {
-				// TODO: handle exception
-				LOG.error("fallback data parse error!");
-				e.printStackTrace();
-			}
-		
-	}
-	
-	*//**
-	 * 保存某个站台停站时间至运行图服务中
-	 * @param dwellTimeCommandJson 设置停站时间命令字符串
-	 * @return
-	 *//*
-	@HystrixCommand(fallbackMethod = "connectTrainrungraphError")
-	public String saveRuntaskCommand(String dwellTimeCommandJson){
-		String resultMsg = null;
-		resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, dwellTimeCommandJson);
-		return resultMsg;
-	}
-	
-	public void connectTrainrungraphError() {
-		LOG.error("---[serv31-trainrungraph] can't connection!---");
-	}
-	
-	public void connectTraincontrolError() {
-		LOG.error("---[serv35-traincontrol] can't connection!---");
-	}*/
 }
