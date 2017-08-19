@@ -32,7 +32,7 @@ eureka:
       
 info:
   app:
-    artiface: "@project.artifact@"
+    artifact: "@project.artifact@"
     name: "@project.name@"
     description: "@project.description@"
     version: "@project.version@"
