@@ -6,6 +6,11 @@
 	<groupId>com.byd5.ats</groupId>
 	<artifactId>serv39-trainruntask</artifactId>
 	<version>0.5.0</version>
+	<packaging>jar</packaging>
+
+	<name>serv39-trainruntask</name>
+        <description>[ATS] 执行列车运行任务，下发列车的站停时间、区间运行时间</description>
+
 
 	<properties>
 		<java.version>1.8</java.version>
