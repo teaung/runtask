@@ -16,24 +16,19 @@
 package com.byd5.ats.rabbitmq;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import org.springframework.web.client.RestTemplate;
-
 import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -54,7 +49,7 @@ public class ReceiverTrace {
 	@Autowired
 	private SenderDepart sender;
 	@Autowired
-	private RestTemplate restTemplate;
+	private TrainrungraphHystrixService trainrungraphHystrixService;
 	
 	/**
 	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
@@ -89,21 +84,20 @@ public class ReceiverTrace {
 		
 		if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
 			if(tablenum != 0){
-				try{
-					String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-					if(resultMsg != null){
-						TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-						runTaskService.mapRunTask.put(carNum, newtask);
-					}else{
-						//需要发报警信息
-						LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
+				if(resultMsg != null && !resultMsg.equals("error")){
+					TrainRunTask newtask = null;
+					try{
+						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+					}catch (Exception e) {
+						LOG.error("[trace.station.enter] runtask parse error!");
+						//e.printStackTrace();
 					}
-				}catch (Exception e) {
-					// TODO: handle exception
-					LOG.error("[trace.station.enter] serv31-trainrungraph can't connetc, or runtask parse error!");
-					e.printStackTrace();
+					runTaskService.mapRunTask.put(carNum, newtask);
+				}else if(resultMsg == null){
+					//需要发报警信息
+					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
 				}
-				
 			}
 		}
 		
@@ -123,22 +117,21 @@ public class ReceiverTrace {
 		//---------------停站时间列表为空，则查询数据库获取--------------
 		if(runTaskService.mapDwellTime.size() == 0){
 			try{
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-				if(resultMsg != null){
+				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				String resultMsg = trainrungraphHystrixService.getRuntaskAllCommand();
+				if(resultMsg != null && !resultMsg.equals("error")){
 					List<AppDataDwellTimeCommand> dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
 					for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
 						runTaskService.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
 					}
-				}else{
-					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+				}else if(resultMsg == null){
+					LOG.error("[trace.station.enter] serv31-trainrungraph fallback getRuntaskAllCommand is null!");
 				}
-				
 			}catch (Exception e) {
 				// TODO: handle exception
-				LOG.error("[trace.station.enter] serv31-trainrungraph can't connetc, or runtask parse error!");
-				e.printStackTrace();
+				LOG.error("[trace.station.enter] getRuntaskAllCommand parse error!");
+				//e.printStackTrace();
 			}
-			
 		}
 		
 		
@@ -152,7 +145,6 @@ public class ReceiverTrace {
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
 			appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
-			
 			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
@@ -213,18 +205,19 @@ public class ReceiverTrace {
 		if(runTaskService.mapRunTask.size() == 0){
 			if(tablenum != 0){
 				try{
-					String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-					if(resultMsg != null){
+					//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
+					String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum); 
+					if(resultMsg != null && !resultMsg.equals("error")){
 						TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
 						runTaskService.mapRunTask.put(carNum, newtask);
-					}else{
+					}else if(resultMsg == null){
 						//需要发报警信息
 						LOG.error("[trace.station.arrive] serv31-trainrungraph fallback runtask is null!");
 					}
 				}catch (Exception e) {
 					// TODO: handle exception
-					LOG.error("[trace.station.arrive] serv31-trainrungraph can't connetc, or runtask parse error!");
-					e.printStackTrace();
+					LOG.error("[trace.station.arrive] runtask parse error!");
+					//e.printStackTrace();
 				}
 			}
 		}
@@ -265,4 +258,66 @@ public class ReceiverTrace {
 		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
+	
+	/**
+	 * 离开折返轨消息处理(列车换端时，给尾端发送的AOD命令)：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
+	 * @param in
+	 * @throws Exception 
+	 */
+	@RabbitListener(queues = "#{queueTraceReturnLeave.name}")
+	public void receiveTraceReturnLeave(String in) throws Exception {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[trace.return.leave] '" + in + "'");
+		
+		TrainEventPosition event = null;
+		ObjectMapper objMapper = new ObjectMapper();
+		TrainEventPosition returnLeaveEvent = null;
+		
+		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		returnLeaveEvent = objMapper.readValue(in, TrainEventPosition.class);
+		
+		Integer carNum = (int) returnLeaveEvent.getCarNum();
+		short tablenum = returnLeaveEvent.getServiceNum();
+		short trainnum = returnLeaveEvent.getTrainNum();
+				
+		//根据当前离开折返轨的车组号，获取上一站的到站信息
+		if (runTaskService.mapTrace.containsKey(carNum)) {
+			event = runTaskService.mapTrace.get(carNum);
+		}		
+		
+		//获取当前车组号对应的运行任务
+		TrainRunTask task = null;
+		if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+			if(tablenum != 0){
+				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
+				if(resultMsg != null && !resultMsg.equals("error")){
+					TrainRunTask newtask = null;
+					try{
+						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+					}catch (Exception e) {
+						LOG.error("[trace.return.leave] runtask parse error!");
+						//e.printStackTrace();
+					}
+					runTaskService.mapRunTask.put(carNum, newtask);
+				}else if(resultMsg == null){
+					//需要发报警信息
+					LOG.error("[trace.return.leave] serv31-trainrungraph fallback runtask is null!");
+				}
+			}
+		}
+		if (runTaskService.mapRunTask.containsKey(carNum)) {
+			task = runTaskService.mapRunTask.get(carNum);
+		}
+		
+		// 向该车发送表号、车次号
+		AppDataATOCommand appDataATOCommand = null;
+		appDataATOCommand = runTaskService.appDataATOCommandTask(task);
+		sender.sendATOCommand(appDataATOCommand);			
+		
+		watch.stop();
+		LOG.info("[trace.return.leave] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
 }

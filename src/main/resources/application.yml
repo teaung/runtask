@@ -2,6 +2,9 @@ spring:
   application:
     name: serv39-trainruntask
     
+  zipkin:
+    baseUrl: http://10.5.133.219:9411
+
   profiles:
     active: topics,sender,remote
 
@@ -40,3 +43,5 @@ info:
     spring-boot-version: "@project.parent.version@"     
 
     
+server:
+  port: 60039

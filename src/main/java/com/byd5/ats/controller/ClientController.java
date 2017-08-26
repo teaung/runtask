@@ -25,6 +25,7 @@ import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.rabbitmq.SenderDepart;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -43,20 +44,22 @@ public class ClientController{
 	private SenderDepart sender;
 	@Autowired
 	private RestTemplate restTemplate;
+	@Autowired
+	private TrainrungraphHystrixService trainrungraphHystrixService;
 	
-	/*** 处理客户端请求 */
+	/*** 处理客户端请求 
+	 * @throws IOException 
+	 * @throws JsonMappingException 
+	 * @throws JsonParseException */
 	@RequestMapping(value = "/client")
-	public @ResponseBody String client(@RequestParam String json){
+	public @ResponseBody String setDwellTime(@RequestParam String json) throws JsonParseException, JsonMappingException, IOException{
 		String result = null;
 		ObjectMapper mapper = new ObjectMapper();
 		Map<String, Object> map = new HashMap<String, Object>();
 		//反序列化
-		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
-		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		LOG.info("--receive--"+json);
-		
-		try {
+		//try {
 			
 			Map mapjson = new HashMap();
 			mapjson = mapper.readValue(json, Map.class); // json转换成map
@@ -69,13 +72,14 @@ public class ClientController{
 				//---------------停站时间列表为空，则查询数据库获取--------------
 				if(runTaskHandler.mapDwellTime.size() == 0){
 					try{
-						String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-						if(resultMsg != null){
+						//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+						String resultMsg = trainrungraphHystrixService.getRuntaskAllCommand();
+						if(resultMsg != null && !resultMsg.equals("error")){
 							List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
 							for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
 								runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
 							}
-						}else{
+						}else if(resultMsg == null){
 							LOG.error("[setDwellTime] serv31-trainrungraph fallback runtask is null!");
 						}
 						
@@ -96,10 +100,11 @@ public class ClientController{
 				}
 				
 				//----------------更新数据库停站时间命令，并更新map列表------------------
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(dwellTimeCommand));
+				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(dwellTimeCommand));
+				String resultMsg = trainrungraphHystrixService.saveRuntaskCommand(mapper.writeValueAsString(dwellTimeCommand));
 				if(resultMsg == null){
 					LOG.error("[setDwellTime] save error Or parse error." );
-				}else{
+				}else if(resultMsg != null && !resultMsg.equals("error")){
 					dwellTimeCommand = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
 					//dwellTimeCommand = (AppDataDwellTimeCommand) mapData.get("commandData");
 					runTaskHandler.mapDwellTime.replace(platform, dwellTimeCommand);
@@ -112,11 +117,11 @@ public class ClientController{
 				result = mapper.writeValueAsString(map);
 			}
 			
-		} catch (Exception e) {
+		/*} catch (Exception e) {
 			// TODO Auto-generated catch block
 			LOG.error("[setDwellTime] parse data error.");
 			e.printStackTrace();
-		}
+		}*/
 		
 		LOG.info("[setDwellTime]--sender--" + result);
 		return result;
@@ -135,23 +140,22 @@ public class ClientController{
 		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		//LOG.info("---[R]--getRuntaskAllCommand--");
 		List<DwellTimeData> dwellTimeDataList = new ArrayList<DwellTimeData>();
-		try{
+		//try{
 			if(runTaskHandler.mapDwellTime == null || runTaskHandler.mapDwellTime.size() == 0){
-				//runTaskHandler.mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
-				System.out.println("----------------");
-				String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+				String resultMsg = trainrungraphHystrixService.getRuntaskAllCommand();
 				try{
-					if(resultMsg != null){
+					if(resultMsg != null && !resultMsg.equals("error")){
 						List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
 						for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
 							runTaskHandler.mapDwellTime.put(AppDataDwellTimeCommand.getPlatformId(), AppDataDwellTimeCommand);
 						}
-					}else{
-						LOG.error("getRuntaskAllCommand fail, or getRuntaskAllCommand is null!");
+					}else if(resultMsg == null){
+						LOG.error("[getRuntaskAllCommand] backdata is null!");
 					}
 				}catch (Exception e) {
 					// TODO: handle exception
-					LOG.error("fallback data parse error!");
+					LOG.error("[getRuntaskAllCommand] fallback data parse error!");
 					e.printStackTrace();
 				}
 			}
@@ -163,11 +167,11 @@ public class ClientController{
 				BeanUtils.copyProperties(dwellTimeCommand, dwellTimeData);
 				dwellTimeDataList.add(dwellTimeData);
 			}
-		}catch (Exception e) {
+		/*}catch (Exception e) {
 			// TODO: handle exception
 			e.printStackTrace();
 			LOG.error("[getRuntaskAllCommand] parse data error.");
-		}
+		}*/
 				
 		mapData.put("ats_station_stop_time", dwellTimeDataList);
 		result = mapper.writeValueAsString(mapData);
@@ -200,10 +204,11 @@ public class ClientController{
 			if(event != null && runTaskHandler.mapRunTask.size() == 0){
 				ObjectMapper objMapper = new ObjectMapper();
 				String resultMsg = null;
-				try{
-					resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, event.getServiceNum(), event.getTrainNum());
+				//try{
+					//resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, event.getServiceNum(), event.getTrainNum());
+					resultMsg = trainrungraphHystrixService.getRuntask(carNum, event.getServiceNum(), event.getTrainNum());
 					try{
-						if(resultMsg != null){
+						if(resultMsg != null && !resultMsg.equals("error")){
 							TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
 							if(newtask != null){
 								runTaskHandler.mapRunTask.put(carNum, newtask);
@@ -212,19 +217,19 @@ public class ClientController{
 								LOG.error("get runtask error. runtask not found");
 							}*/
 						}
-						else{
-							LOG.error("[setDepartCommand] getRuntask fail, or getRuntask is null!");
+						else if(resultMsg == null){
+							LOG.error("[departCommand] getRuntask is null!");
 						}
 					}catch (Exception e) {
 						// TODO: handle exception
-						LOG.error("[setDepartCommand] fallback data parse error!");
+						LOG.error("[departCommand] fallback data parse error!");
 						e.printStackTrace();
 					}
-				}catch (Exception e) {
+				/*}catch (Exception e) {
 					// TODO: handle exception
 					LOG.error("[serv31-trainrungraph] can't connection!");
 					e.printStackTrace();
-				}
+				}*/
 				
 			}
 			
@@ -247,7 +252,7 @@ public class ClientController{
 			else {
 				//LOG.info("[appDataDepartCommand] not find the car (" + carNum + ") in runTask list, so do nothing.");
 				//result = "0";
-				LOG.info("[setDepartCommand] -------------unplanTrain-----------");
+				LOG.info("[departCommand] -------------unplanTrain-----------");
 				
 				//-------------------给车发AOD命令(停站时间0)----------------
 				appDataATOCommand = runTaskHandler.appDataATOCommandEnterUnplan(event);
@@ -260,14 +265,14 @@ public class ClientController{
 			appDataStationTiming.setTime(0x0001);
 			
 			//---------------发送消息--------------------------
-			LOG.info("[setDepartCommand] ATOCommand: next station ["
+			LOG.info("[departCommand] ATOCommand: next station ["
 					+ appDataATOCommand.getNextStationId() + "] section run time ["
 					+ appDataATOCommand.getSectionRunLevel()+ "s]"
 					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
 					+ "s]");
 			sender.sendATOCommand(appDataATOCommand);
 			
-			LOG.info("[setDepartCommand] AppDataTimeStationStop: this station ["
+			LOG.info("[departCommand] AppDataTimeStationStop: this station ["
 					+ appDataStationTiming.getStation_id() + "] section stop time ["
 					+ appDataStationTiming.getTime()
 					+ "s]");
@@ -299,25 +304,18 @@ public class ClientController{
 		String resultMsg = null;
 		ObjectMapper mapper = new ObjectMapper();
 		try{
-			resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, 101, 1, 102);
-			if(resultMsg != null){
+			//resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, 101, 1, 102);
+			
+			resultMsg = trainrungraphHystrixService.getRuntask(101, (short) 1, (short) 102);
+			if(resultMsg != null && !resultMsg.equals("error")){
 				TrainRunTask newtask = mapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
 				runTaskHandler.mapRunTask.put(101, newtask);
 				LOG.error("[getRuntask] "+resultMsg);
-			}else{
+			}else if(resultMsg == null){
 				//需要发报警信息
 				LOG.error("[getRuntask] serv31-trainrungraph fallback runtask is null!");
 			}
 			
-			resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, 102, 1, 103);
-			if(resultMsg != null){
-				TrainRunTask newtask = mapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-				runTaskHandler.mapRunTask.put(102, newtask);
-				LOG.error("[getRuntask] "+resultMsg);
-			}else{
-				//需要发报警信息
-				LOG.error("[getRuntask] serv31-trainrungraph fallback runtask is null!");
-			}
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[getRuntask] serv31-trainrungraph can't connetc, or runtask parse error!");

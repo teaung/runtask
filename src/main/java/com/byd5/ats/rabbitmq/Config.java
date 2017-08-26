@@ -126,6 +126,10 @@ public class Config {
 		public Queue queueTraceStationEnter() {
 			return new AnonymousQueue();
 		}
+		@Bean
+		public Queue queueTraceReturnLeave() {
+			return new AnonymousQueue();
+		}
 		//车辆到站停稳消息
 		@Bean
 		public Binding bindingTraceStationArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationArrive) {
@@ -136,6 +140,11 @@ public class Config {
 		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationEnter) {
 			return BindingBuilder.bind(queueTraceStationEnter).to(ex).with("ats.traintrace.station.enter");
 		}
+		//离开折返轨
+		@Bean
+		public Binding bindingTraceReturnLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceReturnLeave) {
+			return BindingBuilder.bind(queueTraceReturnLeave).to(ex).with("ats.traintrace.return.leave");
+		}		
 		@Bean
 		public ReceiverTrace receiverTrace() {
 			return new ReceiverTrace();
