@@ -19,7 +19,14 @@ public class TrainEventPosition {
 	public String trainHeaderAtphycical;   //车头所在的物理区段
 	private int runningLevel;//运行等级
 	private long timestamp;//精确到ms
+	private int driverNum;//司机号
 	
+	public int getDriverNum() {
+		return driverNum;
+	}
+	public void setDriverNum(int driverNum) {
+		this.driverNum = driverNum;
+	}
 	public String getServTag() {
 		return servTag;
 	}

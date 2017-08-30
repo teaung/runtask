@@ -56,6 +56,8 @@ public class ClientController{
 		String result = null;
 		ObjectMapper mapper = new ObjectMapper();
 		Map<String, Object> map = new HashMap<String, Object>();
+		BackDwellTime2AppData BackDwellTime2AppData = null;
+		
 		//反序列化
 		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		LOG.info("--receive--"+json);
@@ -66,14 +68,25 @@ public class ClientController{
 			Integer runtaskCmdType = (Integer) mapjson.get("runtaskCmdType");
 			
 			if(runtaskCmdType == 114){//停站时间
-				AppDataDwellTimeCommand dwellTimeCommand = mapper.readValue(json, AppDataDwellTimeCommand.class);
+				AppDataDwellTimeCommand dwellTimeCommand = null;
+				try{
+					dwellTimeCommand = mapper.readValue(json, AppDataDwellTimeCommand.class);
+				}catch (Exception e) {
+					// TODO: handle exception
+					BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, false, "设置失败，消息格式有误", 0, 0, 0);
+					map = new HashMap<String, Object>();
+					map.put("tgi_msg", BackDwellTime2AppData);
+					result = mapper.writeValueAsString(map);
+					LOG.info("[setDwellTime]--sender--" + result);
+					return result;
+				}
 				Integer platform = dwellTimeCommand.getPlatformId();//站台ID
 				
 				//---------------停站时间列表为空，则查询数据库获取--------------
 				if(runTaskHandler.mapDwellTime.size() == 0){
 					try{
 						//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-						String resultMsg = trainrungraphHystrixService.getRuntaskAllCommand();
+						String resultMsg = trainrungraphHystrixService.getDwellTime();
 						if(resultMsg != null && !resultMsg.equals("error")){
 							List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
 							for(AppDataDwellTimeCommand AppDataDwellTimeCommand:dataList){
@@ -102,16 +115,19 @@ public class ClientController{
 				//----------------更新数据库停站时间命令，并更新map列表------------------
 				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/saveRuntaskCommand?json={json}", String.class, mapper.writeValueAsString(dwellTimeCommand));
 				String resultMsg = trainrungraphHystrixService.saveRuntaskCommand(mapper.writeValueAsString(dwellTimeCommand));
-				if(resultMsg == null){
+				if(resultMsg == null || resultMsg.equals("error")){
 					LOG.error("[setDwellTime] save error Or parse error." );
+					BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, false, "设置失败，", platform, dwellTimeCommand.getTime(), dwellTimeCommand.getSetWay());
+
 				}else if(resultMsg != null && !resultMsg.equals("error")){
 					dwellTimeCommand = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
 					//dwellTimeCommand = (AppDataDwellTimeCommand) mapData.get("commandData");
 					runTaskHandler.mapDwellTime.replace(platform, dwellTimeCommand);
+					BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, true, "设置成功", platform, dwellTimeCommand.getTime(), dwellTimeCommand.getSetWay());
+					
 				}
 				
 				//--------------------返回结果给客户端----------------------------
-				BackDwellTime2AppData BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, true, "设置成功", platform, dwellTimeCommand.getTime(), dwellTimeCommand.getSetWay());
 				map = new HashMap<String, Object>();
 				map.put("tgi_msg", BackDwellTime2AppData);
 				result = mapper.writeValueAsString(map);
@@ -143,7 +159,7 @@ public class ClientController{
 		//try{
 			if(runTaskHandler.mapDwellTime == null || runTaskHandler.mapDwellTime.size() == 0){
 				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
-				String resultMsg = trainrungraphHystrixService.getRuntaskAllCommand();
+				String resultMsg = trainrungraphHystrixService.getDwellTime();
 				try{
 					if(resultMsg != null && !resultMsg.equals("error")){
 						List<AppDataDwellTimeCommand> dataList = mapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map

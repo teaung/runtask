@@ -312,7 +312,7 @@ public class RunTaskService {
 	 */
 	public AppDataStationTiming appDataStationTimingUnplan(TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
 
-		int platformId = event.getStation();
+		Integer platformId = event.getStation();
 
 		int timeStationStop = 30; // 当前车站站停时间（单位：秒）默认
 		
@@ -363,9 +363,6 @@ public class RunTaskService {
 	public AppDataATOCommand appDataATOCommandEnterUnplan(TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
-		int platformId = event.getStation();
-
-		int timeSectionRun = 0;	//下一站区间运行时间
 		int timeStationStop = 30; // 当前车站站停时间（单位：秒）
 		
 		cmd.setServiceNum((short) 0xFF);
@@ -380,9 +377,7 @@ public class RunTaskService {
 		cmd.setDstLineNum((short) 64); // ??? need rungraph supply!
 		
 		cmd.setDstStationNum(String.valueOf(0xFFFF));
-		//cmd.setDstStationNum(task.getDstStationNum());
 		cmd.setDirectionPlan((short) ((event.getDirectionPlan()==0)?0xAA:0x55)); 
-		//cmd.setDirectionPlan((short) 0xFF); // ??? need rungraph supply!
 		
 		cmd.setSkipStationId(0xFFFF);
 		cmd.setSkipNextStation((short) 0xAA);
@@ -405,6 +400,9 @@ public class RunTaskService {
 			}
 		}		
 		
+		if(event.getStation() == null){//折返轨
+			cmd.setStationStopTime(0xFFFF);
+		}
 		
 		/*Integer nextPlatformId = event.getStation() + 1;
 		if(event.getStation().equals(8)){
@@ -421,18 +419,6 @@ public class RunTaskService {
 			cmd.setSkipNextStation((short) 0x55);
 		}
 		
-		/*try{
-			skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, nextPlatformId);
-			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
-				cmd.setSkipStationId(nextPlatformId);
-				cmd.setSkipNextStation((short) 0x55);
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			//e.printStackTrace();
-		}*/
-		
 		//判断当前车站是否人工设置跳停命令
 		String skipStatus = null;
 		skipStatus = traincontrolHystrixService.getSkipStationStatus(event.getStation());
@@ -440,18 +426,6 @@ public class RunTaskService {
 			cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
 		}
 		
-		/*try{
-			skipStatus = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, event.getStation());
-			if(skipStatus != null && skipStatus.equals("1")){//有跳停
-				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			//e.printStackTrace();
-		}*/
-					
-				
 		return cmd;
 	}
 	

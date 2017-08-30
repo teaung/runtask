@@ -18,6 +18,7 @@ public class TrainRunInfo {
 	private int startStation;//起点站id||
 	private int endStation;//终点站id||
 	private int runningLevel;	//运行等级
+	public int driverNum;//司机号
 
 	public int getLineNum() {
 		return lineNum;
@@ -106,6 +107,14 @@ public class TrainRunInfo {
 
 	public void setRunningLevel(int runningLevel) {
 		this.runningLevel = runningLevel;
+	}
+
+	public int getDriverNum() {
+		return driverNum;
+	}
+
+	public void setDriverNum(int driverNum) {
+		this.driverNum = driverNum;
 	}
 	
 }

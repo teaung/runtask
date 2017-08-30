@@ -43,5 +43,3 @@ info:
     spring-boot-version: "@project.parent.version@"     
 
     
-server:
-  port: 60039

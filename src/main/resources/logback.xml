@@ -13,22 +13,18 @@
 	
 	<!-- 按照每天生成日志文件 -->
 	<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-			<!-- 日志文件输出的文件名 -->
-			<FileNamePattern>${LOG_HOME}/serv39-trainruntask_%d{yyyy-MM-dd}.log</FileNamePattern>
-			<!-- 日志文件保留天数 -->
-			<MaxHistory>90</MaxHistory>
-		</rollingPolicy>
-		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-			<!-- 格式化输出：%d表示日期；%thread表示线程名；%-5level表示级别，从左显示5个字符宽度；%msg表示日志信息；%n是换行符 -->
-			<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
-		</encoder>
-		<!-- 日志文件最大大小 -->
-		<triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-			<MaxFileSize>1024MB</MaxFileSize>
-		</triggeringPolicy>
-	</appender>
-
+		<!-- 当天日志的临时输出文件 -->
+        <file>${LOG_HOME}/serv39-trainruntask.log</file>  <!-- 输出的地址和文件名 D:\\log\\serv39-trainruntask.log -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        	<!-- 定义了日志的切分方式:把每天的日志归档到一个文件中 -->
+            <fileNamePattern>${LOG_HOME}/serv39-trainruntask_%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory> 记录近30天的日志
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+	
 	<!-- show paramerters for hibernate sql. 专为Hibernate定制 -->
 	<logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="INFO" />
 	<logger name="org.hibernate.type.descriptor.sql.BasicExtractor" level="INFO" />

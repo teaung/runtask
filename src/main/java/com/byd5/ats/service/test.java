@@ -20,9 +20,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
  * @author wu.xianglan
  *
  */
-//@Component
-/*@Configurable
-@EnableScheduling*/
+@Component
+@Configurable
+@EnableScheduling
 public class test{
 	
 	private static final Logger logger = LoggerFactory.getLogger(test.class);
@@ -39,7 +39,7 @@ public class test{
 	String realtimeKey = "ats.traindepart.aod.command";
     //每1分钟执行一次
     //@Scheduled(cron = "0 */1 *  * * * ")
-	//@Scheduled(fixedRate = 15000)
+	//@Scheduled(fixedRate = 250)
 	public void senderAppDataStationTiming() {/*
 		
 		ObjectMapper objMapper = new ObjectMapper();
@@ -57,5 +57,7 @@ public class test{
 		
 		template.convertAndSend(exchangeDepart.getName(), realtimeKey, js);
 		logger.info("[departX] " + exchangeDepart.getName() + ":" + realtimeKey + " '" + js + "'");
-	*/}
+	*/
+		logger.info("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+		}
 }

@@ -43,19 +43,17 @@ public class TrainrungraphHystrixService {
 	/**
 	 * 获取所有车站站停时间
 	 */
-	@HystrixCommand(fallbackMethod = "fallbackGetRuntaskAllCommand",
+	@HystrixCommand(fallbackMethod = "fallbackGetDwellTime",
 			commandProperties = {
 					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
 			})
-	public String getRuntaskAllCommand() throws JsonParseException, JsonMappingException, IOException {
-		String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
+	public String getDwellTime() throws JsonParseException, JsonMappingException, IOException {
+		String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getDwellTime", String.class);
 		return resultMsg;	
 	}
 	
-	public String fallbackGetRuntaskAllCommand() throws AmqpException, JsonProcessingException {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
-		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(5203, sdf.format(new Date()), (long)39, "运行任务：获取所有站台停站时间失败，运行图服务故障!", "39");
-		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, mapper.writeValueAsString(alarmEvent));
+	public String fallbackGetDwellTime() throws AmqpException, JsonProcessingException {
+		senderAlarmEvent("运行任务：设置站台停站时间失败，运行图服务故障!");
 		logger.error("[getAllStopTime] serv31-trainrungraph can't connetc, or runtask parse error!");
 		return "error";
 	}
@@ -74,9 +72,7 @@ public class TrainrungraphHystrixService {
 	}
 	
 	public String fallbackSaveRuntaskCommand(String commandStr) throws AmqpException, JsonProcessingException {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
-		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(5203, sdf.format(new Date()), (long)39, "运行任务：设置站台停站时间失败，运行图服务故障!", "39");
-		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, mapper.writeValueAsString(alarmEvent));
+		senderAlarmEvent("运行任务：设置站台停站时间失败，运行图服务故障!");
 		logger.error("[setDwellTime] serv31-trainrungraph connetc error!");
 		return "error";
 	}
@@ -95,10 +91,17 @@ public class TrainrungraphHystrixService {
 	}
 	
 	public String fallbackGetRuntask(Integer groupnum, short tablenum, short trainnum) throws AmqpException, JsonProcessingException {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
-		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(5203, sdf.format(new Date()), (long)39, "运行任务：获取列车运行任务失败，运行图服务故障!", "39");
-		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, mapper.writeValueAsString(alarmEvent));
+		senderAlarmEvent("运行任务：获取列车运行任务失败，运行图服务故障!");
 		logger.error("[getRuntask] serv31-trainrungraph connetc error!");
 		return "error";
+	}
+	
+	
+	public void senderAlarmEvent(String msg) throws AmqpException, JsonProcessingException{
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(5203, sdf.format(new Date()), (long)39, msg, "39");
+		String alarmStr = mapper.writeValueAsString(alarmEvent);
+		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, alarmStr);
+		logger.error("[x] AlarmEvent: "+alarmStr);
 	}
 }

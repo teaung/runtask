@@ -54,9 +54,11 @@ public class TraincontrolHystrixService{
 	}
 	
 	public String fallbackGetSkipStationStatus(Integer platformId) throws AmqpException, JsonProcessingException {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss");
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(5203, sdf.format(new Date()), (long)39, "运行任务：获取站台"+platformId+"是否跳停状态失败，列车控制服务故障!", "39");
-		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, mapper.writeValueAsString(alarmEvent));
+		String alarmStr = mapper.writeValueAsString(alarmEvent);
+		template.convertAndSend(trainrungraphTopic.getName(), alarmKey, alarmStr);
+		logger.error("[x] AlarmEvent: "+alarmStr);
 		logger.error("[getSkipStationStatus] serv35-traincontrol connetc error!");
 		return "error";
 	}
