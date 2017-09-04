@@ -104,6 +104,11 @@ public class Config {
 		}
 		
 		@Bean
+		public Queue queueRungraphChangeTask(){
+			return new AnonymousQueue();
+		}
+		
+		@Bean
 		public Binding bindingAdjust(@Qualifier("exchangeAdjust") TopicExchange ex, Queue queueAdjust) {
 			return BindingBuilder.bind(queueAdjust).to(ex).with("ats.trainadjust.runtime");
 		}
@@ -116,6 +121,11 @@ public class Config {
 		@Bean
 		public Binding bindingRungraphRunInfo(@Qualifier("exchangeRungraph") TopicExchange ex, Queue queueRungraphRunInfo) {
 			return BindingBuilder.bind(queueRungraphRunInfo).to(ex).with("ats.trainrungraph.runOutgarage");
+		}
+		
+		@Bean
+		public Binding bindingRungraphChangeTask(@Qualifier("exchangeRungraph") TopicExchange ex, Queue queueRungraphChangeTask) {
+			return BindingBuilder.bind(queueRungraphChangeTask).to(ex).with("ats.trainrungraph.changeTask");
 		}
 		
 		@Bean

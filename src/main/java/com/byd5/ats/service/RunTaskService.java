@@ -82,8 +82,7 @@ public class RunTaskService {
 		cmd.setSkipNextStation((short) 0xAA);
 		cmd.setSectionRunLevel(0);//?
 		
-		//判断下一站是否人工设置跳停命令
-		String skipStatusStr = null;
+		
 		/*try{
 			skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, first.getPlatformId());
 			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
@@ -96,6 +95,8 @@ public class RunTaskService {
 			e.printStackTrace();
 		}*/
 		
+		//判断下一站是否人工设置跳停命令
+		String skipStatusStr = null;
 		skipStatusStr = traincontrolHystrixService.getSkipStationStatus(first.getPlatformId());
 		if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
 			cmd.setSkipStationId(first.getPlatformId());
@@ -184,6 +185,15 @@ public class RunTaskService {
 					
 			// 区间运行等级/区间运行时间
 			cmd.setSectionRunLevel(timeSectionRun);
+			
+			
+			//判断下一站是否人工设置跳停命令
+			String skipStatusStr = null;
+			skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
+			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
+				cmd.setSkipStationId(nextStation.getPlatformId());
+				cmd.setSkipNextStation((short) 0x55);
+			}
 		}
 		
 		cmd.setDetainCmd((short) 0);
@@ -201,13 +211,13 @@ public class RunTaskService {
 			}
 		}		
 				
-		//判断下一站是否人工设置跳停命令
+		/*//判断下一站是否人工设置跳停命令
 		String skipStatusStr = null;
 		skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
 		if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
 			cmd.setSkipStationId(nextStation.getPlatformId());
 			cmd.setSkipNextStation((short) 0x55);
-		}
+		}*/
 		
 		/*try{
 			skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, nextStation.getPlatformId());
@@ -329,12 +339,15 @@ public class RunTaskService {
 			}
 		}		
 		
-		//判断是否人工设置跳停命令
-		String skipStatus = null;
-		skipStatus = traincontrolHystrixService.getSkipStationStatus(platformId);
-		if(skipStatus != null && skipStatus.equals("1")){//有跳停
-			appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
-		}
+		/*if(event.getStation() != null){
+			//判断是否人工设置跳停命令
+			String skipStatus = null;
+			skipStatus = traincontrolHystrixService.getSkipStationStatus(platformId);
+			if(skipStatus != null && skipStatus.equals("1")){//有跳停
+				appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
+			}
+		}*/
+		
 		
 		/*try{
 			skipStatus = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, platformId);
@@ -408,23 +421,25 @@ public class RunTaskService {
 		if(event.getStation().equals(8)){
 			nextPlatformId = 1;
 		}*/
-		Integer nextPlatformId = event.nextStationId;
+		Integer nextPlatformId = event.getNextStationId();
 		cmd.setNextStationId(nextPlatformId);
 		
 		//判断下一站是否人工设置跳停命令
-		String skipStatusStr = null;
+		/*String skipStatusStr = null;
 		skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
 		if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
 			cmd.setSkipStationId(nextPlatformId);
 			cmd.setSkipNextStation((short) 0x55);
 		}
 		
-		//判断当前车站是否人工设置跳停命令
-		String skipStatus = null;
-		skipStatus = traincontrolHystrixService.getSkipStationStatus(event.getStation());
-		if(skipStatus != null && skipStatus.equals("1")){//有跳停
-			cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
-		}
+		if(event.getStation() != null){
+			//判断当前车站是否人工设置跳停命令
+			String skipStatus = null;
+			skipStatus = traincontrolHystrixService.getSkipStationStatus(event.getStation());
+			if(skipStatus != null && skipStatus.equals("1")){//有跳停
+				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
+			}
+		}*/
 		
 		return cmd;
 	}

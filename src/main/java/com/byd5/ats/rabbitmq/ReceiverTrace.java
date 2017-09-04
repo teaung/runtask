@@ -81,26 +81,10 @@ public class ReceiverTrace {
 		
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
+		String dsStationNum = event.getDstStationNum();
 		
-		if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
-			if(tablenum != 0){
-				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
-				if(resultMsg != null && !resultMsg.equals("error")){
-					TrainRunTask newtask = null;
-					try{
-						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-					}catch (Exception e) {
-						LOG.error("[trace.station.enter] runtask parse error!");
-						//e.printStackTrace();
-					}
-					runTaskService.mapRunTask.put(carNum, newtask);
-				}else if(resultMsg == null){
-					//需要发报警信息
-					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
-					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
-				}
-			}
-		}
+		//获取或 更新运行图任务信息
+		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);
@@ -202,27 +186,10 @@ public class ReceiverTrace {
 				
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
+		String dsStationNum = event.getDstStationNum();
 		
-		if(runTaskService.mapRunTask.size() == 0){
-			if(tablenum != 0){
-				try{
-					//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntask?groupnum={carNum}&tablenum={tablenum}&trainnum={trainnum}", String.class, carNum, tablenum, trainnum);
-					String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum); 
-					if(resultMsg != null && !resultMsg.equals("error")){
-						TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-						runTaskService.mapRunTask.put(carNum, newtask);
-					}else if(resultMsg == null){
-						//需要发报警信息
-						trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
-						LOG.error("[trace.station.arrive] serv31-trainrungraph fallback runtask is null!");
-					}
-				}catch (Exception e) {
-					// TODO: handle exception
-					LOG.error("[trace.station.arrive] runtask parse error!");
-					//e.printStackTrace();
-				}
-			}
-		}
+		//获取或 更新运行图任务信息
+		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
 			task = runTaskService.mapRunTask.get(carNum);
@@ -284,29 +251,16 @@ public class ReceiverTrace {
 			Integer carNum = (int) returnLeaveEvent.getCarNum();
 			short tablenum = returnLeaveEvent.getServiceNum();
 			short trainnum = returnLeaveEvent.getTrainNum();
+			String dsStationNum = returnLeaveEvent.getDstStationNum();
 			
 			if(tablenum != 0){
 				//获取当前车组号对应的运行任务
 				TrainRunTask task = null;
-				if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
-					if(tablenum != 0){
-						String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
-						if(resultMsg != null && !resultMsg.equals("error")){
-							TrainRunTask newtask = null;
-							try{
-								newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-							}catch (Exception e) {
-								LOG.error("[trace.return.leave] runtask parse error!");
-								//e.printStackTrace();
-							}
-							runTaskService.mapRunTask.put(carNum, newtask);
-						}else if(resultMsg == null){
-							//需要发报警信息
-							trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
-							LOG.error("[trace.return.leave] serv31-trainrungraph fallback runtask is null!");
-						}
-					}
-				}
+				//if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+				
+				//获取或 更新运行图任务信息
+				getRuntask(carNum, tablenum, trainnum, dsStationNum);
+				
 				if (runTaskService.mapRunTask.containsKey(carNum)) {
 					task = runTaskService.mapRunTask.get(carNum);
 				}
@@ -336,5 +290,43 @@ public class ReceiverTrace {
 		
 		watch.stop();
 		LOG.info("[trace.return.leave] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
+	
+	
+	/**
+	 * 根据车组号、表号和车次号获取列车运行任务信息
+	 * @param carNum
+	 * @param tablenum
+	 * @param trainnum
+	 * @throws IOException 
+	 * @throws JsonMappingException 
+	 * @throws JsonParseException 
+	 */
+	public void getRuntask(int carNum, short tablenum, short trainnum, String dsStationNum) throws JsonParseException, JsonMappingException, IOException{
+		ObjectMapper objMapper = new ObjectMapper();
+		if(runTaskService.mapRunTask.size() == 0 && tablenum != 0 && !"ZH".equals(dsStationNum)){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+			//if(tablenum != 0){
+				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
+				if(resultMsg != null && !resultMsg.equals("error")){
+					TrainRunTask newtask = null;
+					try{
+						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+					}catch (Exception e) {
+						LOG.error("[trace.station.enter] runtask parse error!");
+						//e.printStackTrace();
+					}
+					if (!runTaskService.mapRunTask.containsKey(carNum)) {
+						runTaskService.mapRunTask.put(carNum, newtask);
+					}
+					else {
+						runTaskService.mapRunTask.replace(carNum, newtask);
+					}
+				}else if(resultMsg == null){
+					//需要发报警信息
+					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
+					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+				}
+			//}
+		}
 	}
 }
