@@ -144,8 +144,14 @@ public class ReceiverRungraph {
 		
 		try{
 			task = objMapper.readValue(in, TrainRunTask.class);
-			
+			Integer carNum = task.getTraingroupnum();
 			if(task != null){
+				if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
+					runTaskHandler.mapRunTask.put(carNum, task);
+				}
+				else {
+					runTaskHandler.mapRunTask.replace(carNum, task);
+				}
 				// 向该车发送表号、车次号
 				AppDataATOCommand appDataATOCommand = null;
 				appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);

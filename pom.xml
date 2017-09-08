@@ -5,7 +5,7 @@
 
 	<groupId>com.byd5.ats</groupId>
 	<artifactId>serv39-trainruntask</artifactId>
-	<version>0.5.4</version>
+	<version>0.5.4.1</version>
 	<packaging>jar</packaging>
 
 	<name>serv39-trainruntask</name>

@@ -76,31 +76,47 @@ public class RunTaskService {
 		cmd.setDirectionPlan((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
-		cmd.setNextStationId(first.getPlatformId());
+		//cmd.setNextStationId(first.getPlatformId());//下一停车站台ID
+		cmd.setNextStationId(0xFFFF);//下一停车站台ID(默认)
 		cmd.setStationStopTime(0xFFFF); //计划站停时间（单位：秒）
 		cmd.setSkipStationId(0xFFFF);
 		cmd.setSkipNextStation((short) 0xAA);
 		cmd.setSectionRunLevel(0);//?
 		
-		
-		/*try{
-			skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, first.getPlatformId());
-			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
-				cmd.setSkipStationId(first.getPlatformId());
-				cmd.setSkipNextStation((short) 0x55);
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			e.printStackTrace();
-		}*/
-		
-		//判断下一站是否人工设置跳停命令
+		//下一站有人工设置跳停命令或者运行计划有跳停
 		String skipStatusStr = null;
 		skipStatusStr = traincontrolHystrixService.getSkipStationStatus(first.getPlatformId());
-		if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
+		if(skipStatusStr != null && skipStatusStr.equals("1") || first.isSkip()){//有跳停
 			cmd.setSkipStationId(first.getPlatformId());
 			cmd.setSkipNextStation((short) 0x55);
+		}
+		else {//下一站无跳停
+			cmd.setSkipStationId(0xFFFF);
+			cmd.setSkipNextStation((short) 0xAA);
+			cmd.setNextStationId(first.getPlatformId());
+		}			
+		
+		if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
+			int platformId = first.getNextPlatformId();
+			int runtime = 0;
+			for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
+				TrainRunTimetable t = timetableList.get(i);
+				String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(platformId);
+				//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
+				if (platformId != lastStation.getPlatformId()){
+					runtime += (int) ((t.getPlanArriveTime() - first.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+					if(t.getPlatformId() == platformId
+						&& !t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {
+						cmd.setNextStationId(t.getPlatformId());
+						//cmd.setSectionRunLevel(runtime);
+						break;
+					}
+					platformId = t.getNextPlatformId();
+					first = timetableList.get(i);
+				}
+				
+			}
+			
 		}
 		
 		cmd.setDetainCmd((short) 0);
@@ -171,29 +187,24 @@ public class RunTaskService {
 		}
 		//若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间
 		else{
-			cmd.setNextStationId(currStation.getNextPlatformId());
+			//cmd.setNextStationId(currStation.getNextPlatformId());
+			cmd.setNextStationId(0xFFFF);
 			cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
-			// 判断下一站是否跳停？
-			if (nextStation.isSkip()) {
-				cmd.setSkipNextStation((short) 0x55);
-				cmd.setSkipStationId(nextStation.getPlatformId());
-			}
-			else {
-				cmd.setSkipStationId(0xFFFF);
-				cmd.setSkipNextStation((short) 0xAA);
-			}		
-					
-			// 区间运行等级/区间运行时间
-			cmd.setSectionRunLevel(timeSectionRun);
 			
-			
-			//判断下一站是否人工设置跳停命令
+			//下一站有人工设置跳停命令或者运行计划有跳停
 			String skipStatusStr = null;
 			skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
-			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
+			if(skipStatusStr != null && skipStatusStr.equals("1") || nextStation.isSkip()){//有跳停
 				cmd.setSkipStationId(nextStation.getPlatformId());
 				cmd.setSkipNextStation((short) 0x55);
 			}
+			else {//下一站无跳停
+				cmd.setSkipStationId(0xFFFF);
+				cmd.setSkipNextStation((short) 0xAA);
+				cmd.setNextStationId(currStation.getNextPlatformId());
+				cmd.setSectionRunLevel(timeSectionRun);// 区间运行等级/区间运行时间
+			}				
+		
 		}
 		
 		cmd.setDetainCmd((short) 0);
@@ -210,26 +221,6 @@ public class RunTaskService {
 				cmd.setStationStopTime(timeStationStop);
 			}
 		}		
-				
-		/*//判断下一站是否人工设置跳停命令
-		String skipStatusStr = null;
-		skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
-		if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
-			cmd.setSkipStationId(nextStation.getPlatformId());
-			cmd.setSkipNextStation((short) 0x55);
-		}*/
-		
-		/*try{
-			skipStatusStr = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, nextStation.getPlatformId());
-			if(skipStatusStr != null && skipStatusStr.equals("1")){//有跳停
-				cmd.setSkipStationId(nextStation.getPlatformId());
-				cmd.setSkipNextStation((short) 0x55);
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			//e.printStackTrace();
-		}*/
 			
 		//判断当前车站是否人工设置跳停命令
 		String skipStatus = null;
@@ -238,17 +229,26 @@ public class RunTaskService {
 			cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
 		}
 		
-		/*try{
-			skipStatus = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, currStation.getPlatformId());
-			if(skipStatus != null && skipStatus.equals("1")){//有跳停
-				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
+		if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
+			int nextPlatformId = currStation.getNextPlatformId();
+			int runtime = 0;
+			for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
+				TrainRunTimetable t = timetableList.get(i);
+				String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
+				System.out.println("------skipStatusStr1---"+skipStatusStr1);
+				System.out.println(t.getPlatformId()+"------nextPlatformId---"+nextPlatformId);
+				if (t.getPlatformId() == nextPlatformId){
+					runtime += (int) ((t.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+					if(!t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
+						cmd.setNextStationId(t.getPlatformId());
+						cmd.setSectionRunLevel(runtime);
+						break;
+					}
+					nextPlatformId = t.getNextPlatformId();
+					currStation = timetableList.get(i);
+				}
 			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			//e.printStackTrace();
-		}*/
-				
+		}
 				
 		return cmd;
 	}
@@ -295,18 +295,6 @@ public class RunTaskService {
 		if(skipStatus != null && skipStatus.equals("1")){//有跳停
 			appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
 		}
-		
-		/*try{
-			skipStatus = restTemplate.getForObject("http://serv35-traincontrol/SkipStationStatus/info?stationId={stationId}", String.class, currStation.getPlatformId());
-			if(skipStatus != null && skipStatus.equals("1")){//有跳停
-				appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
-			}
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("serv35-traincontrol can't connect, or parse error!");
-			//e.printStackTrace();
-		}*/
-		
 				
 		return appDataStationTiming;
 	}

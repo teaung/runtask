@@ -42,6 +42,3 @@ info:
     spring-boot-artifact: "@project.parent.artifact@"
     spring-boot-version: "@project.parent.version@"     
 
-    
-server:
-  port: 60039

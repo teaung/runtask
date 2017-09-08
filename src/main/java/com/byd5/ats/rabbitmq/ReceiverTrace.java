@@ -304,7 +304,10 @@ public class ReceiverTrace {
 	 */
 	public void getRuntask(int carNum, short tablenum, short trainnum, String dsStationNum) throws JsonParseException, JsonMappingException, IOException{
 		ObjectMapper objMapper = new ObjectMapper();
-		if(runTaskService.mapRunTask.size() == 0 && tablenum != 0 && !"ZH".equals(dsStationNum)){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+		if((runTaskService.mapRunTask.size() == 0 && tablenum != 0
+			|| runTaskService.mapRunTask.size() > 0 && runTaskService.mapRunTask.containsKey(carNum)
+			&& runTaskService.mapRunTask.get(carNum).getTrainnum()!= trainnum)
+				 && !"ZH".equals(dsStationNum)){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
 			//if(tablenum != 0){
 				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
 				if(resultMsg != null && !resultMsg.equals("error")){
