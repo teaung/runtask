@@ -124,12 +124,12 @@ public class ReceiverTrace {
 		AppDataATOCommand appDataATOCommand = null;
 
 		if (task != null) {//计划车
-			appDataATOCommand = runTaskService.appDataATOCommandEnter(task, event);
+			appDataATOCommand = runTaskService.aodCmdEnter(task, event);
 	
 		}
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
-			appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(event);
+			appDataATOCommand = runTaskService.aodCmdEnterUnplan(event);
 			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
@@ -268,7 +268,7 @@ public class ReceiverTrace {
 				if(task != null){
 					// 向该车发送表号、车次号
 					AppDataATOCommand appDataATOCommand = null;
-					appDataATOCommand = runTaskService.appDataATOCommandTask(task);
+					appDataATOCommand = runTaskService.aodCmdReturn(task);
 					sender.sendATOCommand(appDataATOCommand);
 				}
 				else{
@@ -280,7 +280,7 @@ public class ReceiverTrace {
 			else{
 				LOG.info("[trace.return.leave] unplanTrain--------");
 				AppDataATOCommand appDataATOCommand = null;
-				appDataATOCommand = runTaskService.appDataATOCommandEnterUnplan(returnLeaveEvent);
+				appDataATOCommand = runTaskService.aodCmdEnterUnplan(returnLeaveEvent);
 				sender.sendATOCommand(appDataATOCommand);
 			}
 		}catch (Exception e) {
@@ -306,8 +306,8 @@ public class ReceiverTrace {
 		ObjectMapper objMapper = new ObjectMapper();
 		if((runTaskService.mapRunTask.size() == 0 && tablenum != 0
 			|| runTaskService.mapRunTask.size() > 0 && runTaskService.mapRunTask.containsKey(carNum)
-			&& runTaskService.mapRunTask.get(carNum).getTrainnum()!= trainnum)
-				 && !"ZH".equals(dsStationNum)){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+			&& runTaskService.mapRunTask.get(carNum).getTrainnum()!= trainnum && tablenum != 0) //&& !"ZH".equals(dsStationNum)
+			){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
 			//if(tablenum != 0){
 				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
 				if(resultMsg != null && !resultMsg.equals("error")){

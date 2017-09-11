@@ -260,7 +260,7 @@ public class ClientController{
 
 			if (task != null && event != null && event.getStation() == platformId) {
 				//-------------------给车发AOD命令(停站时间0)----------------
-				appDataATOCommand = runTaskHandler.appDataATOCommandEnter(task, event);
+				appDataATOCommand = runTaskHandler.aodCmdEnter(task, event);
 		
 				//-------------------给客户端发停站时间0----------------
 				appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
@@ -271,7 +271,7 @@ public class ClientController{
 				LOG.info("[departCommand] -------------unplanTrain-----------");
 				
 				//-------------------给车发AOD命令(停站时间0)----------------
-				appDataATOCommand = runTaskHandler.appDataATOCommandEnterUnplan(event);
+				appDataATOCommand = runTaskHandler.aodCmdEnterUnplan(event);
 		
 				//-------------------给客户端发停站时间0----------------
 				appDataStationTiming = runTaskHandler.appDataStationTimingUnplan(event);

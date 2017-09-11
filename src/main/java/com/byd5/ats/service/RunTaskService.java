@@ -51,7 +51,8 @@ public class RunTaskService {
 	 * @param task
 	 * @return
 	 */
-	public AppDataATOCommand appDataATOCommandTask(TrainRunTask task) throws Exception {
+	public AppDataATOCommand aodCmdReturn(TrainRunTask task) throws Exception {
+		LOG.info("--达折返aodCmdReturn--start");
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
 		cmd.setServiceNum((short) task.getTablenum());
@@ -101,12 +102,11 @@ public class RunTaskService {
 			int runtime = 0;
 			for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
 				TrainRunTimetable t = timetableList.get(i);
-				String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(platformId);
 				//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-				if (platformId != lastStation.getPlatformId()){
+				if (t.getPlatformId() == platformId && platformId!= 0 && platformId != 9){
+					String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(platformId);
 					runtime += (int) ((t.getPlanArriveTime() - first.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-					if(t.getPlatformId() == platformId
-						&& !t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {
+					if(!t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {
 						cmd.setNextStationId(t.getPlatformId());
 						//cmd.setSectionRunLevel(runtime);
 						break;
@@ -124,7 +124,7 @@ public class RunTaskService {
 		cmd.setGotoRailYard((short) 0);
 		cmd.setDoorControl((short) 0xFF);
 		cmd.setReserved(0);
-		
+		LOG.info("--达折返aodCmdReturn--end");
 		return cmd;
 	}
 	
@@ -136,7 +136,8 @@ public class RunTaskService {
 	 * @throws JsonMappingException 
 	 * @throws JsonParseException 
 	 */
-	public AppDataATOCommand appDataATOCommandEnter(TrainRunTask task, TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
+	public AppDataATOCommand aodCmdEnter(TrainRunTask task, TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
+		LOG.info("--aodCmdEnter--start");
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
 		int platformId = event.getStation();
@@ -154,102 +155,110 @@ public class RunTaskService {
 				nextStation = timetableList.get(i+1);
 			}
 		}
-		
-		timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
-		timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+		if(currStation != null && nextStation != null){
+			timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
+			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 
-		cmd.setServiceNum((short) task.getTablenum());
-		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setNextZcId(0);
-		cmd.setNextCiId(0);
-		cmd.setNextAtsId(0);
-		cmd.setCarLineNum(task.getLineNum());
-		cmd.setCarNum((short) task.getTraingroupnum());
-		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum((short) task.getTrainnum());
-		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-		
-		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
-		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-		
-		cmd.setDstStationNum(endPlatformId);
-		//cmd.setDstStationNum(task.getDstStationNum());
-		cmd.setDirectionPlan((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
-		
-		//若当前车站是终点站，则只发当前车站站停时间
-		if(currStation.getPlatformId() == lastStation.getPlatformId()){
-			cmd.setSkipStationId(0xFFFF);
-			cmd.setSkipNextStation((short) 0xAA);
-			cmd.setNextStationId(0xFFFF);
-			cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
-			cmd.setSectionRunLevel(0);
-			//cmd.setSectionRunLevel(timeSectionRun);
-		}
-		//若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间
-		else{
-			//cmd.setNextStationId(currStation.getNextPlatformId());
-			cmd.setNextStationId(0xFFFF);
-			cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
+			cmd.setServiceNum((short) task.getTablenum());
+			cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
+			cmd.setNextZcId(0);
+			cmd.setNextCiId(0);
+			cmd.setNextAtsId(0);
+			cmd.setCarLineNum(task.getLineNum());
+			cmd.setCarNum((short) task.getTraingroupnum());
+			cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
+			cmd.setTrainNum((short) task.getTrainnum());
+			cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
 			
-			//下一站有人工设置跳停命令或者运行计划有跳停
-			String skipStatusStr = null;
-			skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
-			if(skipStatusStr != null && skipStatusStr.equals("1") || nextStation.isSkip()){//有跳停
-				cmd.setSkipStationId(nextStation.getPlatformId());
-				cmd.setSkipNextStation((short) 0x55);
-			}
-			else {//下一站无跳停
+			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
+			String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
+			
+			cmd.setDstStationNum(endPlatformId);
+			//cmd.setDstStationNum(task.getDstStationNum());
+			cmd.setDirectionPlan((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
+			
+			//若当前车站是终点站，则只发当前车站站停时间
+			if(currStation.getPlatformId() == lastStation.getPlatformId()){
 				cmd.setSkipStationId(0xFFFF);
 				cmd.setSkipNextStation((short) 0xAA);
-				cmd.setNextStationId(currStation.getNextPlatformId());
-				cmd.setSectionRunLevel(timeSectionRun);// 区间运行等级/区间运行时间
-			}				
-		
-		}
-		
-		cmd.setDetainCmd((short) 0);
-		cmd.setReturnCmd((short) 0);
-		cmd.setGotoRailYard((short) 0);
-		cmd.setDoorControl((short) 0xFF);
-		cmd.setReserved(0);
-		
-		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-		if(mapDwellTime.containsKey(currStation.getPlatformId())){
-			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
-			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
-				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
-				cmd.setStationStopTime(timeStationStop);
+				cmd.setNextStationId(0xFFFF);
+				cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
+				cmd.setSectionRunLevel(0);
+				//cmd.setSectionRunLevel(timeSectionRun);
 			}
-		}		
+			//若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间
+			else{
+				//cmd.setNextStationId(currStation.getNextPlatformId());
+				cmd.setNextStationId(0xFFFF);
+				cmd.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）
+				
+				//下一站有人工设置跳停命令或者运行计划有跳停
+				String skipStatusStr = null;
+				skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
+				if(skipStatusStr != null && skipStatusStr.equals("1") || nextStation.isSkip()){//有跳停
+					cmd.setSkipStationId(nextStation.getPlatformId());
+					cmd.setSkipNextStation((short) 0x55);
+				}
+				else {//下一站无跳停
+					cmd.setSkipStationId(0xFFFF);
+					cmd.setSkipNextStation((short) 0xAA);
+					cmd.setNextStationId(currStation.getNextPlatformId());
+					cmd.setSectionRunLevel(timeSectionRun);// 区间运行等级/区间运行时间
+				}				
 			
-		//判断当前车站是否人工设置跳停命令
-		String skipStatus = null;
-		skipStatus = traincontrolHystrixService.getSkipStationStatus(currStation.getPlatformId());
-		if(skipStatus != null && skipStatus.equals("1")){//有跳停
-			cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
-		}
-		
-		if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
-			int nextPlatformId = currStation.getNextPlatformId();
-			int runtime = 0;
-			for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
-				TrainRunTimetable t = timetableList.get(i);
-				String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
-				System.out.println("------skipStatusStr1---"+skipStatusStr1);
-				System.out.println(t.getPlatformId()+"------nextPlatformId---"+nextPlatformId);
-				if (t.getPlatformId() == nextPlatformId){
-					runtime += (int) ((t.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-					if(!t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-						cmd.setNextStationId(t.getPlatformId());
-						cmd.setSectionRunLevel(runtime);
-						break;
+			}
+			
+			cmd.setDetainCmd((short) 0);
+			cmd.setReturnCmd((short) 0);
+			cmd.setGotoRailYard((short) 0);
+			cmd.setDoorControl((short) 0xFF);
+			cmd.setReserved(0);
+			
+			//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+			if(mapDwellTime.containsKey(currStation.getPlatformId())){
+				AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
+				if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+					timeStationStop = dwellTimeCommand.getTime();//设置停站时间
+					cmd.setStationStopTime(timeStationStop);
+				}
+			}		
+				
+			//判断当前车站是否人工设置跳停命令
+			String skipStatus = null;
+			skipStatus = traincontrolHystrixService.getSkipStationStatus(currStation.getPlatformId());
+			if(skipStatus != null && skipStatus.equals("1")){//有跳停
+				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
+			}
+			
+			if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
+				int nextPlatformId = currStation.getNextPlatformId();
+				int runtime = 0;
+				for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
+					TrainRunTimetable t = timetableList.get(i);
+					
+					if (t.getPlatformId() == nextPlatformId  && platformId!= 0 && platformId != 9){
+						String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
+						System.out.println("------skipStatusStr1---"+skipStatusStr1);
+						System.out.println(t.getPlatformId()+"------nextPlatformId---"+nextPlatformId);
+						runtime += (int) ((t.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+						if(!t.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
+							cmd.setNextStationId(t.getPlatformId());
+							cmd.setSectionRunLevel(runtime);
+							break;
+						}
+						nextPlatformId = t.getNextPlatformId();
+						currStation = timetableList.get(i);
 					}
-					nextPlatformId = t.getNextPlatformId();
-					currStation = timetableList.get(i);
 				}
 			}
 		}
-				
+		else{
+			LOG.error("[aodCmdEnter]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
+			return null;
+		}
+		
+		
+		LOG.info("--aodCmdEnter--end");		
 		return cmd;
 	}
 
@@ -263,8 +272,9 @@ public class RunTaskService {
 	 * @throws JsonParseException 
 	 */
 	public AppDataStationTiming appDataStationTiming(TrainRunTask task, TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
-
+		LOG.info("--appDataStationTiming--start");
 		int platformId = event.getStation();
+		AppDataStationTiming appDataStationTiming = new AppDataStationTiming();
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
 		TrainRunTimetable currStation = null;
@@ -274,28 +284,35 @@ public class RunTaskService {
 				currStation = t;
 			}
 		}
-		int timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
 		
-		AppDataStationTiming appDataStationTiming = new AppDataStationTiming();
-		appDataStationTiming.setStation_id(currStation.getPlatformId());
-		appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
-		
-		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-		if(mapDwellTime.containsKey(currStation.getPlatformId())){
-			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
-			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
-				timeStationStop = dwellTimeCommand.getTime();//设置停站时间
-				appDataStationTiming.setTime(timeStationStop);
+		if(currStation != null){
+			int timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
+			
+			appDataStationTiming.setStation_id(currStation.getPlatformId());
+			appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
+			
+			//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+			if(mapDwellTime.containsKey(currStation.getPlatformId())){
+				AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(currStation.getPlatformId());
+				if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+					timeStationStop = dwellTimeCommand.getTime();//设置停站时间
+					appDataStationTiming.setTime(timeStationStop);
+				}
+			}		
+			
+			//判断是否人工设置跳停命令
+			String skipStatus = null;
+			skipStatus = traincontrolHystrixService.getSkipStationStatus(currStation.getPlatformId());
+			if(skipStatus != null && skipStatus.equals("1")){//有跳停
+				appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
 			}
-		}		
-		
-		//判断是否人工设置跳停命令
-		String skipStatus = null;
-		skipStatus = traincontrolHystrixService.getSkipStationStatus(currStation.getPlatformId());
-		if(skipStatus != null && skipStatus.equals("1")){//有跳停
-			appDataStationTiming.setTime(0x0001);; //设置站停时间（单位：秒）
 		}
-				
+		else{
+			LOG.error("[appDataStationTiming]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
+			return null;
+		}
+		
+		LOG.info("--appDataStationTiming--end");		
 		return appDataStationTiming;
 	}
 	
@@ -309,7 +326,7 @@ public class RunTaskService {
 	 * @throws JsonParseException 
 	 */
 	public AppDataStationTiming appDataStationTimingUnplan(TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
-
+		LOG.info("--appDataStationTimingUnplan--start");
 		Integer platformId = event.getStation();
 
 		int timeStationStop = 30; // 当前车站站停时间（单位：秒）默认
@@ -348,7 +365,7 @@ public class RunTaskService {
 			//e.printStackTrace();
 		}*/
 		
-				
+		LOG.info("--appDataStationTimingUnplan--end");		
 		return appDataStationTiming;
 	}
 	
@@ -361,7 +378,8 @@ public class RunTaskService {
 	 * @throws JsonMappingException 
 	 * @throws JsonParseException 
 	 */
-	public AppDataATOCommand appDataATOCommandEnterUnplan(TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
+	public AppDataATOCommand aodCmdEnterUnplan(TrainEventPosition event) throws JsonParseException, JsonMappingException, IOException {
+		LOG.info("--aodCmdEnterUnplan--start");
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
 		int timeStationStop = 30; // 当前车站站停时间（单位：秒）
@@ -428,7 +446,7 @@ public class RunTaskService {
 				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
 			}
 		}*/
-		
+		LOG.info("--aodCmdEnterUnplan--end");
 		return cmd;
 	}
 	
@@ -439,7 +457,8 @@ public class RunTaskService {
 	 * @param task
 	 * @return
 	 */
-	public AppDataATOCommand appDataATOCommandTask(TrainRunInfo trainRunInfo) throws Exception {
+	public AppDataATOCommand aodCmdTransform(TrainRunInfo trainRunInfo) throws Exception {
+		LOG.info("--aodCmdTransform--start");
 		AppDataATOCommand cmd = new AppDataATOCommand();
 
 		cmd.setServiceNum((short) trainRunInfo.getTablenum());
@@ -469,7 +488,7 @@ public class RunTaskService {
 		cmd.setGotoRailYard((short) 0);
 		cmd.setDoorControl((short) 0xFF);
 		cmd.setReserved(0);
-		
+		LOG.info("--aodCmdTransform--end");
 		return cmd;
 	}
 	

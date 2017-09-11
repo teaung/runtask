@@ -101,12 +101,16 @@ public class SenderDepart {
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		
 		String js = null;
-		js = objMapper.writeValueAsString(appDataATOCommand);
+		
+		if(appDataATOCommand != null){
+			js = objMapper.writeValueAsString(appDataATOCommand);
 
-		//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
-		String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
-		template.convertAndSend(topic.getName(), routeKey, js);
-		LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
+			String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
+			template.convertAndSend(topic.getName(), routeKey, js);
+			LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+		}
+		
 	}
 	
 	/**
@@ -122,13 +126,17 @@ public class SenderDepart {
 		String js = null;
 		
 		Map<String, Object> map = new HashMap<String, Object>();
-		map.put("ats_station_timing", appDataStationTiming);
-		js = objMapper.writeValueAsString(map);
 		
+		if(appDataStationTiming != null){
+			map.put("ats_station_timing", appDataStationTiming);
+			js = objMapper.writeValueAsString(map);
+			
+			
+			//js = objMapper.writeValueAsString(appDataStationTiming);
+			
+			template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
+			LOG.info("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
+		}
 		
-		//js = objMapper.writeValueAsString(appDataStationTiming);
-		
-		template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
-		LOG.info("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
 	}
 }

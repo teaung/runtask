@@ -82,7 +82,7 @@ public class ReceiverAdjust {
 		// 重新向该车发送下一站区间运行时间
 		AppDataATOCommand appDataATOCommand = null;
 		if(event != null){
-			appDataATOCommand = runTaskHandler.appDataATOCommandEnter(adjustTask, event);
+			appDataATOCommand = runTaskHandler.aodCmdEnter(adjustTask, event);
 			
 			//----------------------计划离站时间有改动----------------
 			int platformId = event.getStation();

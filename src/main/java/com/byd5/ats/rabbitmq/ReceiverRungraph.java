@@ -18,6 +18,7 @@ package com.byd5.ats.rabbitmq;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import com.byd5.ats.message.AppDataATOCommand;
@@ -58,10 +59,9 @@ public class ReceiverRungraph {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
-		//反序列化
-		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
-		//objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
 		try{
 			task = objMapper.readValue(in, TrainRunTask.class);
 			
@@ -77,7 +77,7 @@ public class ReceiverRungraph {
 			
 			// 向该车发送表号、车次号
 			AppDataATOCommand appDataATOCommand = null;
-			appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);
+			appDataATOCommand = runTaskHandler.aodCmdReturn(task);
 			
 			sender.sendATOCommand(appDataATOCommand);
 		}catch (Exception e) {
@@ -104,14 +104,15 @@ public class ReceiverRungraph {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
-		//objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
 		try{
 			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
 			
 			// 向该车发送表号、车次号
 			AppDataATOCommand appDataATOCommand = null;
-			appDataATOCommand = runTaskHandler.appDataATOCommandTask(trainRunInfo);
+			appDataATOCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
 			
 			sender.sendATOCommand(appDataATOCommand);
 		}catch (Exception e) {
@@ -154,7 +155,9 @@ public class ReceiverRungraph {
 				}
 				// 向该车发送表号、车次号
 				AppDataATOCommand appDataATOCommand = null;
-				appDataATOCommand = runTaskHandler.appDataATOCommandTask(task);
+				TrainRunInfo trainRunInfo = new TrainRunInfo();
+				BeanUtils.copyProperties(task, trainRunInfo);
+				appDataATOCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
 				sender.sendATOCommand(appDataATOCommand);
 			}
 			

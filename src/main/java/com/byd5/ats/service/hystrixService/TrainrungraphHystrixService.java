@@ -53,7 +53,7 @@ public class TrainrungraphHystrixService {
 	}
 	
 	public String fallbackGetDwellTime() throws AmqpException, JsonProcessingException {
-		senderAlarmEvent("运行任务：设置站台停站时间失败，运行图服务故障!");
+		senderAlarmEvent("运行任务：获取站台停站时间失败，运行图服务故障!");
 		logger.error("[getAllStopTime] serv31-trainrungraph can't connetc, or runtask parse error!");
 		return "error";
 	}
