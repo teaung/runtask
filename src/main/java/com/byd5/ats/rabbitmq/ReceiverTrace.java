@@ -83,7 +83,7 @@ public class ReceiverTrace {
 		short trainnum = event.getTrainNum();
 		String dsStationNum = event.getDstStationNum();
 		
-		//获取或 更新运行图任务信息
+		//-------------获取或 更新运行图任务信息
 		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
@@ -125,15 +125,25 @@ public class ReceiverTrace {
 
 		if (task != null) {//计划车
 			appDataATOCommand = runTaskService.aodCmdEnter(task, event);
-	
+			LOG.info("[trace.station.enter] ATOCommand: next station ["
+					+ appDataATOCommand.getNextStationId() + "] section run time ["
+					+ appDataATOCommand.getSectionRunLevel()+ "s]"
+					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
+					+ "s]");
+			
+			if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+				sender.sendATOCommand(appDataATOCommand);
+				sender.sendATOCommand(appDataATOCommand);
+			}
+			sender.sendATOCommand(appDataATOCommand);
 		}
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
-			appDataATOCommand = runTaskService.aodCmdEnterUnplan(event);
-			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			//appDataATOCommand = runTaskService.aodCmdEnterUnplan(event);
+			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
 		
-		LOG.info("[trace.station.enter] ATOCommand: next station ["
+		/*LOG.info("[trace.station.enter] ATOCommand: next station ["
 				+ appDataATOCommand.getNextStationId() + "] section run time ["
 				+ appDataATOCommand.getSectionRunLevel()+ "s]"
 				+ "section stop time ["+ appDataATOCommand.getStationStopTime()
@@ -144,7 +154,7 @@ public class ReceiverTrace {
 			sender.sendATOCommand(appDataATOCommand);
 			sender.sendATOCommand(appDataATOCommand);
 		}
-		sender.sendATOCommand(appDataATOCommand);
+		sender.sendATOCommand(appDataATOCommand);*/
 		
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -188,7 +198,7 @@ public class ReceiverTrace {
 		short trainnum = event.getTrainNum();
 		String dsStationNum = event.getDstStationNum();
 		
-		//获取或 更新运行图任务信息
+		//-------获取或 更新运行图任务信息
 		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
 		if (runTaskService.mapRunTask.containsKey(carNum)) {
@@ -208,20 +218,26 @@ public class ReceiverTrace {
 
 		if (task != null) {
 			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
+			
+			LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
+					+ appDataStationTiming.getStation_id() + "] section stop time ["
+					+ appDataStationTiming.getTime()
+					+ "s]");
+			
+			sender.senderAppDataStationTiming(appDataStationTiming);
 		}
 		else {
 			LOG.info("[trace.station.arrive] unplanTrain----");
-			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
-
-			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			//appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}		
 		
-		LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
+		/*LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
 				+ appDataStationTiming.getStation_id() + "] section stop time ["
 				+ appDataStationTiming.getTime()
 				+ "s]");
 		
-		sender.senderAppDataStationTiming(appDataStationTiming);
+		sender.senderAppDataStationTiming(appDataStationTiming);*/
 		
 		watch.stop();
 		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -258,7 +274,7 @@ public class ReceiverTrace {
 				TrainRunTask task = null;
 				//if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
 				
-				//获取或 更新运行图任务信息
+				//------------获取或 更新运行图任务信息
 				getRuntask(carNum, tablenum, trainnum, dsStationNum);
 				
 				if (runTaskService.mapRunTask.containsKey(carNum)) {
@@ -271,17 +287,18 @@ public class ReceiverTrace {
 					appDataATOCommand = runTaskService.aodCmdReturn(task);
 					sender.sendATOCommand(appDataATOCommand);
 				}
-				else{
+				/*else{
 					//需要发报警信息
 					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
 					LOG.error("[trace.return.leave] serv31-trainrungraph fallback runtask is null!");
-				}
+				}*/
 			}
 			else{
 				LOG.info("[trace.return.leave] unplanTrain--------");
-				AppDataATOCommand appDataATOCommand = null;
-				appDataATOCommand = runTaskService.aodCmdEnterUnplan(returnLeaveEvent);
-				sender.sendATOCommand(appDataATOCommand);
+				//AppDataATOCommand appDataATOCommand = null;
+				//appDataATOCommand = runTaskService.aodCmdEnterUnplan(returnLeaveEvent);
+				//sender.sendATOCommand(appDataATOCommand);
+				LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
