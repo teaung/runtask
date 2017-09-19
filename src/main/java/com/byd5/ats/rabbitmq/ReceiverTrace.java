@@ -77,27 +77,19 @@ public class ReceiverTrace {
 		
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
-		TrainRunTask task = null;
 		
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
 		String dsStationNum = event.getDstStationNum();
 		
 		//-------------获取或 更新运行图任务信息
+		runTaskService.clearMapRuntask(carNum, tablenum);//非计划车时，移除残留的计划车运行任务信息
 		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
-		if (runTaskService.mapRunTask.containsKey(carNum)) {
-			task = runTaskService.mapRunTask.get(carNum);
-		}
+		TrainRunTask task = runTaskService.getMapRuntask(carNum);
 		
 		//添加列车到站信息
-		if (!runTaskService.mapTrace.containsKey(carNum)) {
-			runTaskService.mapTrace.put(carNum, event);
-		}
-		else {
-			runTaskService.mapTrace.replace(carNum, event);
-		}
-		
+		runTaskService.updateMapTrace(carNum, event);
 		
 		//---------------停站时间列表为空，则查询数据库获取--------------
 		if(runTaskService.mapDwellTime.size() == 0){
@@ -184,34 +176,19 @@ public class ReceiverTrace {
 		
 		// 检查该车是否有记录
 		Integer carNum = (int) event.getCarNum();
-		TrainRunTask task = null;
 		
 		//添加列车到站信息
-		if (!runTaskService.mapTrace.containsKey(carNum)) {
-			runTaskService.mapTrace.put(carNum, event);
-		}
-		else {
-			runTaskService.mapTrace.replace(carNum, event);
-		}		
+		runTaskService.updateMapTrace(carNum, event);
 				
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
 		String dsStationNum = event.getDstStationNum();
 		
 		//-------获取或 更新运行图任务信息
+		runTaskService.clearMapRuntask(carNum, tablenum);
 		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
-		if (runTaskService.mapRunTask.containsKey(carNum)) {
-			task = runTaskService.mapRunTask.get(carNum);
-		}
-		
-		//添加列车到站信息
-		if (!runTaskService.mapTrace.containsKey(carNum)) {
-			runTaskService.mapTrace.put(carNum, event);
-		}
-		else {
-			runTaskService.mapTrace.replace(carNum, event);
-		}		
+		TrainRunTask task = runTaskService.getMapRuntask(carNum);
 		
 		// 向客户端发送站停时间
 		AppDataStationTiming appDataStationTiming = null;
@@ -228,8 +205,9 @@ public class ReceiverTrace {
 		}
 		else {
 			LOG.info("[trace.station.arrive] unplanTrain----");
-			//appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
-			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+			sender.senderAppDataStationTiming(appDataStationTiming);
+			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}		
 		
 		/*LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
@@ -271,15 +249,11 @@ public class ReceiverTrace {
 			
 			if(tablenum != 0){
 				//获取当前车组号对应的运行任务
-				TrainRunTask task = null;
-				//if(runTaskService.mapRunTask.size() == 0){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
-				
 				//------------获取或 更新运行图任务信息
+				runTaskService.clearMapRuntask(carNum, tablenum);
 				getRuntask(carNum, tablenum, trainnum, dsStationNum);
 				
-				if (runTaskService.mapRunTask.containsKey(carNum)) {
-					task = runTaskService.mapRunTask.get(carNum);
-				}
+				TrainRunTask task = runTaskService.getMapRuntask(carNum);
 				
 				if(task != null){
 					// 向该车发送表号、车次号

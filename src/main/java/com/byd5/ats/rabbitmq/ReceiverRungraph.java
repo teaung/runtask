@@ -50,12 +50,10 @@ public class ReceiverRungraph {
 	public void receiveRungraph(String in) throws Exception {
 		StopWatch watch = new StopWatch();
 		watch.start();
-		//System.out.println("[rungraph] '" + in + "'");
 		//doWork(in);
 		LOG.info("[rungraph] '" + in + "'");
 		
 		TrainRunTask task = null;
-		TrainRunTimetable timetable = null;
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
@@ -66,14 +64,8 @@ public class ReceiverRungraph {
 			task = objMapper.readValue(in, TrainRunTask.class);
 			
 			// 添加运行任务列表
-			//runTaskHandler.runTaskList.add(task);
 			Integer carNum = task.getTraingroupnum();
-			if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
-				runTaskHandler.mapRunTask.put(carNum, task);
-			}
-			else {
-				runTaskHandler.mapRunTask.replace(carNum, task);
-			}
+			runTaskHandler.updateMapRuntask(carNum, task);
 			
 			// 向该车发送表号、车次号
 			AppDataATOCommand appDataATOCommand = null;
@@ -137,7 +129,6 @@ public class ReceiverRungraph {
 		LOG.info("[rungraph.changeTask] '" + in + "'");
 		
 		ObjectMapper objMapper = new ObjectMapper();
-		TrainEventPosition returnLeaveEvent = null;
 		TrainRunTask task = null;
 		
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
@@ -147,12 +138,8 @@ public class ReceiverRungraph {
 			task = objMapper.readValue(in, TrainRunTask.class);
 			Integer carNum = task.getTraingroupnum();
 			if(task != null){
-				if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
-					runTaskHandler.mapRunTask.put(carNum, task);
-				}
-				else {
-					runTaskHandler.mapRunTask.replace(carNum, task);
-				}
+				runTaskHandler.updateMapRuntask(carNum, task);
+				
 				// 向该车发送表号、车次号
 				AppDataATOCommand appDataATOCommand = null;
 				TrainRunInfo trainRunInfo = new TrainRunInfo();

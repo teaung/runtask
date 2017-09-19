@@ -97,7 +97,7 @@ public class RunTaskService {
 			cmd.setNextStationId(first.getPlatformId());
 		}			
 		
-		if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
+		if(cmd.getSkipNextStation() == 0x55){//有跳停,则获取跳停站台后的第一个停车站台
 			int platformId = first.getNextPlatformId();
 			int runtime = 0;
 			for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
@@ -230,7 +230,7 @@ public class RunTaskService {
 				cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
 			}
 			
-			if(cmd.getSkipNextStation() != 0xFFFF){//有跳停,则获取跳停站台后的第一个停车站台
+			if(cmd.getSkipNextStation() == 0x55){//有跳停,则获取跳停站台后的第一个停车站台
 				int nextPlatformId = currStation.getNextPlatformId();
 				int runtime = 0;
 				for (int i = 0; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
@@ -491,5 +491,47 @@ public class RunTaskService {
 		LOG.info("--aodCmdTransform--end");
 		return cmd;
 	}
+
+	/**更新运行任务列表*/
+	public void updateMapRuntask(Integer carNum, TrainRunTask runTask){
+		if (!mapRunTask.containsKey(carNum)) {
+			mapRunTask.put(carNum, runTask);
+		}
+		else {
+			mapRunTask.replace(carNum, runTask);
+		}
+	}
 	
+	/**更新列车位置信息列表*/
+	public void updateMapTrace(Integer carNum, TrainEventPosition trace){
+		if (!mapTrace.containsKey(carNum)) {
+			mapTrace.put(carNum, trace);
+		}
+		else {
+			mapTrace.replace(carNum, trace);
+		}
+	}
+	
+	/**检查该车是否有记录*/
+	public TrainEventPosition getMapTrace(Integer carNum){
+		if (mapTrace.containsKey(carNum)) {
+			return mapTrace.get(carNum);
+		}
+		return null;		
+	}
+	
+	/**检查该运行任务是否有记录*/
+	public TrainRunTask getMapRuntask(Integer carNum){
+		if (mapRunTask.containsKey(carNum)) {
+			return mapRunTask.get(carNum);
+		}
+		return null;		
+	}
+	
+	/**非计划车时，移除残留的计划车运行任务信息*/
+	public void clearMapRuntask(Integer carNum, short tablenum){
+		if (tablenum == 0) {//非计划车，则移除
+			mapRunTask.remove(carNum);
+		}
+	}
 }

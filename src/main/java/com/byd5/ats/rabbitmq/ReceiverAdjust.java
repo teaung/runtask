@@ -66,19 +66,11 @@ public class ReceiverAdjust {
 		
 		// 更新运行任务列表
 		Integer carNum = adjustTask.getTraingroupnum();
-		if (!runTaskHandler.mapRunTask.containsKey(carNum)) {
-			runTaskHandler.mapRunTask.put(carNum, adjustTask);
-		}
-		else {
-			runTaskHandler.mapRunTask.replace(carNum, adjustTask);
-		}
+		runTaskHandler.updateMapRuntask(carNum, adjustTask);
 		
-		TrainEventPosition event = null;
 		// 检查该车是否有记录
-		if (runTaskHandler.mapTrace.containsKey(carNum)) {
-			event = runTaskHandler.mapTrace.get(carNum);
-		}		
-				
+		TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+		
 		// 重新向该车发送下一站区间运行时间
 		AppDataATOCommand appDataATOCommand = null;
 		if(event != null){
