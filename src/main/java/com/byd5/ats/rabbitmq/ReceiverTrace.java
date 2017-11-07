@@ -22,7 +22,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import com.byd5.ats.message.AppDataATOCommand;
+
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
@@ -113,21 +114,21 @@ public class ReceiverTrace {
 		
 		
 		// 向该车发送站间运行等级
-		AppDataATOCommand appDataATOCommand = null;
+		AppDataAVAtoCommand appDataAVAtoCommand = null;
 
 		if (task != null) {//计划车
-			appDataATOCommand = runTaskService.aodCmdEnter(task, event);
+			appDataAVAtoCommand = runTaskService.aodCmdEnter(task, event);
 			LOG.info("[trace.station.enter] ATOCommand: next station ["
-					+ appDataATOCommand.getNextStationId() + "] section run time ["
-					+ appDataATOCommand.getSectionRunLevel()+ "s]"
-					+ "section stop time ["+ appDataATOCommand.getStationStopTime()
+					+ appDataAVAtoCommand.getNextStopPlatformId() + "] section run time ["
+					+ appDataAVAtoCommand.getSectionRunAdjustCmd()+ "s]"
+					+ "section stop time ["+ appDataAVAtoCommand.getPlatformStopTime()
 					+ "s]");
 			
-			if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
-				sender.sendATOCommand(appDataATOCommand);
-				sender.sendATOCommand(appDataATOCommand);
+			if(appDataAVAtoCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+				sender.sendATOCommand(appDataAVAtoCommand);
+				sender.sendATOCommand(appDataAVAtoCommand);
 			}
-			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataAVAtoCommand);
 		}
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
@@ -257,9 +258,9 @@ public class ReceiverTrace {
 				
 				if(task != null){
 					// 向该车发送表号、车次号
-					AppDataATOCommand appDataATOCommand = null;
-					appDataATOCommand = runTaskService.aodCmdReturn(task);
-					sender.sendATOCommand(appDataATOCommand);
+					AppDataAVAtoCommand appDataAVAtoCommand = null;
+					appDataAVAtoCommand = runTaskService.aodCmdReturn(task);
+					sender.sendATOCommand(appDataAVAtoCommand);
 				}
 				/*else{
 					//需要发报警信息

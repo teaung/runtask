@@ -60,7 +60,7 @@
 		<dependency>
 			<groupId>com.byd.ats</groupId>
 			<artifactId>lib01-protocol-ats2ext</artifactId>
-			<version>0.1.0</version>
+			<version>0.1.1</version>
 		</dependency>
 
 		<dependency>

@@ -15,24 +15,16 @@
  */
 package com.byd5.ats.rabbitmq;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
-
-import com.byd5.ats.message.AppDataATOCommand;
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
-import com.byd.ats.protocol.AppProtocolConstant;
-import com.byd.ats.protocol.ats_vobc.FrameATOCommand;
 import com.byd5.ats.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,11 +63,6 @@ public class SenderDepart {
 	//public final static String SERVID = "traindepart" + UUID.randomUUID().toString().replace("-", "");
 	public final static String SERVID = "traindepart(" + Utils.getLocalIP() + ")";
 
-	
-	private int index;
-
-	private int count;
-
 	public void sendDepart(TrainRunTimetable table) throws JsonProcessingException {
 		
 		//table.servTag = this.tag;
@@ -95,15 +82,15 @@ public class SenderDepart {
 	 * @param appDataATOCommand
 	 * @throws JsonProcessingException
 	 */
-	public void sendATOCommand(AppDataATOCommand appDataATOCommand) throws JsonProcessingException {
+	public void sendATOCommand(AppDataAVAtoCommand appDataAVAtoCommand) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		
 		String js = null;
 		
-		if(appDataATOCommand != null){
-			js = objMapper.writeValueAsString(appDataATOCommand);
+		if(appDataAVAtoCommand != null){
+			js = objMapper.writeValueAsString(appDataAVAtoCommand);
 
 			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
 			String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";

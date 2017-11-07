@@ -24,7 +24,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 
-import com.byd5.ats.message.AppDataATOCommand;
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
@@ -72,9 +72,10 @@ public class ReceiverAdjust {
 		TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
 		
 		// 重新向该车发送下一站区间运行时间
-		AppDataATOCommand appDataATOCommand = null;
+		AppDataAVAtoCommand appDataAVAtoCommand = null;
+//		AppDataATOCommand appDataATOCommand = null;
 		if(event != null){
-			appDataATOCommand = runTaskHandler.aodCmdEnter(adjustTask, event);
+			appDataAVAtoCommand = runTaskHandler.aodCmdEnter(adjustTask, event);
 			
 			//----------------------计划离站时间有改动----------------
 			int platformId = event.getStation();
@@ -86,16 +87,16 @@ public class ReceiverAdjust {
 					currStation = t;
 				}
 			}
-			int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
-			appDataATOCommand.setStationStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
+			int platformStopTime = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
+			appDataAVAtoCommand.setPlatformStopTime(platformStopTime); //计划站停时间（单位：秒）0xFFFF
 			//------------------------------------------------------
 			
-			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataAVAtoCommand);
 			
 			LOG.info("[adjust] ATOCommand: next station ["
-					+ appDataATOCommand.getNextStationId() + "] next section run time ["
-					+ appDataATOCommand.getSectionRunLevel()+ "s]"
-					+ "This station stop time ["+ appDataATOCommand.getStationStopTime()
+					+ appDataAVAtoCommand.getNextStopPlatformId() + "] next section run time ["
+					+ appDataAVAtoCommand.getSectionRunAdjustCmd()+ "s]"
+					+ "This station stop time ["+ appDataAVAtoCommand.getPlatformStopTime()
 					+ "s]");
 		}
 		else {

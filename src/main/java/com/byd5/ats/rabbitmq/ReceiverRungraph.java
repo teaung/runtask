@@ -21,11 +21,9 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import com.byd5.ats.message.AppDataATOCommand;
-import com.byd5.ats.message.TrainEventPosition;
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
-import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.service.RunTaskService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,10 +66,10 @@ public class ReceiverRungraph {
 			runTaskHandler.updateMapRuntask(carNum, task);
 			
 			// 向该车发送表号、车次号
-			AppDataATOCommand appDataATOCommand = null;
-			appDataATOCommand = runTaskHandler.aodCmdReturn(task);
+			AppDataAVAtoCommand appDataAVAtoCommand = null;
+			appDataAVAtoCommand = runTaskHandler.aodCmdReturn(task);
 			
-			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataAVAtoCommand);
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[rungraph runtask] parse data error!");
@@ -103,10 +101,10 @@ public class ReceiverRungraph {
 			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
 			
 			// 向该车发送表号、车次号
-			AppDataATOCommand appDataATOCommand = null;
-			appDataATOCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
+			AppDataAVAtoCommand appDataAVAtoCommand = null;
+			appDataAVAtoCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
 			
-			sender.sendATOCommand(appDataATOCommand);
+			sender.sendATOCommand(appDataAVAtoCommand);
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[rungraph RunInfo] parse data error!");
@@ -141,11 +139,11 @@ public class ReceiverRungraph {
 				runTaskHandler.updateMapRuntask(carNum, task);
 				
 				// 向该车发送表号、车次号
-				AppDataATOCommand appDataATOCommand = null;
+				AppDataAVAtoCommand appDataAVAtoCommand = null;
 				TrainRunInfo trainRunInfo = new TrainRunInfo();
 				BeanUtils.copyProperties(task, trainRunInfo);
-				appDataATOCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
-				sender.sendATOCommand(appDataATOCommand);
+				appDataAVAtoCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
+				sender.sendATOCommand(appDataAVAtoCommand);
 			}
 			
 		}catch (Exception e) {

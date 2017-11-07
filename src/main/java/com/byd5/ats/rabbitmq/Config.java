@@ -23,8 +23,7 @@ import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-
-import com.byd.ats.protocol.AppProtocolConstant;
+import com.byd.ats.protocol.RabbConstant;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 
@@ -38,11 +37,11 @@ public class Config {
 
 	@Bean
 	public TopicExchange topicATS2CU() {
-		return new TopicExchange(AppProtocolConstant.EXCHANGE_ATS2CU); //"topic.ats2cu"
+		return new TopicExchange(RabbConstant.RABB_EX_ATS2CU); //"topic.ats2cu"
 	}
 	@Bean
 	public TopicExchange topicCU2ATS() {
-		return new TopicExchange(AppProtocolConstant.EXCHANGE_CU2ATS); //"topic.cu2ats"
+		return new TopicExchange(RabbConstant.RABB_EX_CU2ATS); //"topic.cu2ats"
 	}
 
 	@Bean
@@ -176,7 +175,7 @@ public class Config {
 		}
 		@Bean
 		public Binding bindingATOStatus(@Qualifier("topicCU2ATS") TopicExchange ex, Queue queueATOStatus) {
-			return BindingBuilder.bind(queueATOStatus).to(ex).with(AppProtocolConstant.ROUTINGKEY_VOBC_ATO_STATUS); //"cu2ats.vobc.ato.status"
+			return BindingBuilder.bind(queueATOStatus).to(ex).with(RabbConstant.RABB_RK_VA_ATO_STATUS); //"cu2ats.vobc.ato.status"
 		}
 	}
 

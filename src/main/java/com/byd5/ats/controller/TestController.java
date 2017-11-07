@@ -1,34 +1,15 @@
 package com.byd5.ats.controller;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import com.byd5.ats.message.AppDataATOCommand;
-import com.byd5.ats.message.AppDataDwellTimeCommand;
-import com.byd5.ats.message.AppDataStationTiming;
-import com.byd5.ats.message.BackDwellTime2AppData;
-import com.byd5.ats.message.DwellTimeData;
 import com.byd5.ats.message.TrainEventPosition;
-import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.rabbitmq.ReceiverTrace;
-import com.byd5.ats.rabbitmq.SenderDepart;
-import com.byd5.ats.service.RunTaskService;
-import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
