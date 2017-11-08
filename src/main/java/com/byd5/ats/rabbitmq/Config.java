@@ -22,6 +22,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import com.byd.ats.protocol.RabbConstant;
 import com.byd5.ats.utils.RuntaskConstant;
 
@@ -33,7 +34,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
  */
 //@Profile({"tut5","topics"})
 @Configuration
-public class Config {
+public class Config{
 
 	@Bean
 	public TopicExchange topicATS2CU() {
@@ -61,12 +62,12 @@ public class Config {
 	@Bean
 	public TopicExchange exchangeDepart() {
 		//return new TopicExchange("topic.ats2aod");
-		return new TopicExchange(RuntaskConstant.RABB_EX_RUNTASK);
+		return new TopicExchange(RuntaskConstant.RABB_EX_DEPART);
 	}
 	
 	@Bean
 	public TopicExchange exchangeAdjust() {
-		return new TopicExchange(RuntaskConstant.RABB_EX_ADJUST);
+		return new TopicExchange(RuntaskConstant.RABB_EX_DJUST);
 	}
 	
 	//@Profile("receiver")
@@ -119,7 +120,7 @@ public class Config {
 		
 		@Bean
 		public Binding bindingRungraphRunInfo(@Qualifier("exchangeRungraph") TopicExchange ex, Queue queueRungraphRunInfo) {
-			return BindingBuilder.bind(queueRungraphRunInfo).to(ex).with(RuntaskConstant.RABB_RK_RUNGRAPH_OUT);
+			return BindingBuilder.bind(queueRungraphRunInfo).to(ex).with(RuntaskConstant.RABB_RK_RUNGRAPH_OUTGARAGE);
 		}
 		
 		@Bean
@@ -146,28 +147,23 @@ public class Config {
 		//车辆到站停稳消息
 		@Bean
 		public Binding bindingTraceStationArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationArrive) {
-			return BindingBuilder.bind(queueTraceStationArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_SA);
+			return BindingBuilder.bind(queueTraceStationArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_STATION);
 		}
 		//到站（不管是否停稳）
 		@Bean
 		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationEnter) {
-			return BindingBuilder.bind(queueTraceStationEnter).to(ex).with(RuntaskConstant.RABB_RK_TRACE_SE);
+			return BindingBuilder.bind(queueTraceStationEnter).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ENTER_STATION);
 		}
 		//离开折返轨
 		@Bean
 		public Binding bindingTraceReturnLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceReturnLeave) {
-			return BindingBuilder.bind(queueTraceReturnLeave).to(ex).with(RuntaskConstant.RABB_RK_TRACE_RL);
+			return BindingBuilder.bind(queueTraceReturnLeave).to(ex).with(RuntaskConstant.RABB_RK_TRACE_LEAVE_RETURN);
 		}
-		//到达折返轨
-		/*@Bean
-		public Binding bindingTraceReturnArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceReturnArrive) {
-			return BindingBuilder.bind(queueTraceReturnArrive).to(ex).with("ats.traintrace.return.arrive");
-		}*/
-		//到达转换轨
+		// 离开折返轨
 		@Bean
-		public Binding bindingTraceTransformArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceTransformArrive) {
-			return BindingBuilder.bind(queueTraceTransformArrive).to(ex).with("ats.traintrace.transform.arrive");
-		}
+		public Binding bindingTraceTransformArrive(@Qualifier("exchangeTrace") TopicExchange ex,Queue queueTraceTransformArrive) {
+			return BindingBuilder.bind(queueTraceTransformArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_TRANSFORM);
+		}	
 		@Bean
 		public ReceiverTrace receiverTrace() {
 			return new ReceiverTrace();

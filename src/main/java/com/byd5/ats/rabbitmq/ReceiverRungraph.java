@@ -21,7 +21,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
+import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
@@ -46,13 +46,11 @@ public class ReceiverRungraph {
 	private SenderDepart sender;
 
 	@RabbitListener(queues = "#{queueRungraph.name}")
-	public void receiveRungraph(String in) throws Exception {
+	public void receiveRungraph(String in) {
 		StopWatch watch = new StopWatch();
 		watch.start();
 		//doWork(in);
 		LOG.info("[rungraph] '" + in + "'");
-		
-		TrainRunTask task = null;
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		
@@ -60,24 +58,23 @@ public class ReceiverRungraph {
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
 		try{
-			task = objMapper.readValue(in, TrainRunTask.class);
+			TrainRunTask task = objMapper.readValue(in, TrainRunTask.class);
 			
 			// 添加运行任务列表
 			Integer carNum = task.getTraingroupnum();
 			runTaskHandler.updateMapRuntask(carNum, task);
 			
-			// 检查该车是否有记录---2017-11-08
+			// 检查该车是否有记录----2017-11-08
 			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
-			
 			if(event != null){
 			// 向该车发送表号、车次号
-			AppDataAVAtoCommand appDataAVAtoCommand = null;
-			appDataAVAtoCommand = runTaskHandler.aodCmdReturn(event, task);
+			AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdReturn(event, task);
 			
-			sender.sendATOCommand(appDataAVAtoCommand);
+			sender.sendATOCommand(appDataATOCommand);
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
+			e.printStackTrace();
 			LOG.error("[rungraph runtask] parse data error!");
 		}
 		
@@ -92,7 +89,7 @@ public class ReceiverRungraph {
 	 * @throws Exception
 	 */
 	@RabbitListener(queues = "#{queueRungraphRunInfo.name}")
-	public void receiveRungraphRunInfo(String in) throws Exception {
+	public void receiveRungraphRunInfo(String in){
 		StopWatch watch = new StopWatch();
 		watch.start();
 		LOG.info("[rungraph RunInfo] '" + in + "'");
@@ -105,19 +102,18 @@ public class ReceiverRungraph {
 		
 		try{
 			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
-			// 检查该车是否有记录---2017-11-08
 			Integer carNum = trainRunInfo.getTraingroupnum();
+			// 检查该车是否有记录----2017-11-08
 			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
-						
 			if(event != null){
 			// 向该车发送表号、车次号
-			AppDataAVAtoCommand appDataAVAtoCommand = null;
-			appDataAVAtoCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
+			AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
 			
-			sender.sendATOCommand(appDataAVAtoCommand);
+			sender.sendATOCommand(appDataATOCommand);
 			}
 		}catch (Exception e) {
 			// TODO: handle exception
+			e.printStackTrace();
 			LOG.error("[rungraph RunInfo] parse data error!");
 		}
 		
@@ -132,38 +128,37 @@ public class ReceiverRungraph {
 	 * @throws Exception 
 	 */
 	@RabbitListener(queues = "#{queueRungraphChangeTask.name}")
-	public void receiveRungraphChangeTask(String in) throws Exception {
+	public void receiveRungraphChangeTask(String in) {
 		StopWatch watch = new StopWatch();
 		watch.start();
 		LOG.info("[rungraph.changeTask] '" + in + "'");
 		
 		ObjectMapper objMapper = new ObjectMapper();
-		TrainRunTask task = null;
 		
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
 		try{
-			task = objMapper.readValue(in, TrainRunTask.class);
-			Integer carNum = task.getTraingroupnum();
+			TrainRunTask task = objMapper.readValue(in, TrainRunTask.class);
 			if(task != null){
-				runTaskHandler.updateMapRuntask(carNum, task);
+				runTaskHandler.updateMapRuntask(task.getTraingroupnum(), task);
 				
-				// 检查该车是否有记录---2017-11-08
-				TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
-							
-				if(event != null){
 				// 向该车发送表号、车次号
-				AppDataAVAtoCommand appDataAVAtoCommand = null;
 				TrainRunInfo trainRunInfo = new TrainRunInfo();
 				BeanUtils.copyProperties(task, trainRunInfo);
-				appDataAVAtoCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
-				sender.sendATOCommand(appDataAVAtoCommand);
+				
+				Integer carNum = trainRunInfo.getTraingroupnum();
+				// 检查该车是否有记录----2017-11-08
+				TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+				if(event != null){
+				AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
+				sender.sendATOCommand(appDataATOCommand);
 				}
 			}
 			
 		}catch (Exception e) {
 			// TODO: handle exception
+			e.printStackTrace();
 			LOG.error("[rungraph.changeTask] 消息处理出错!");
 		}
 		

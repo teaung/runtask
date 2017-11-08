@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.rabbitmq.ReceiverTrace;
@@ -28,12 +29,13 @@ public class TestController{
 	
 	/*** (计划车)列车到站（未停稳）测试*/
 	@RequestMapping(value = "/stationEnter")
-	public void stationEnter() throws JsonParseException, JsonMappingException, IOException{
+	public void stationEnter(@RequestParam short carNum, @RequestParam short trainNum
+			,@RequestParam int station) throws JsonParseException, JsonMappingException, IOException{
 		event.setServiceNum((short) 1);
-		event.setTrainNum((short) 102);
-		event.setCargroupNum((short) 103);
+		event.setTrainNum(trainNum);
+		event.setCargroupNum(carNum);
 		event.setTimestamp(1505520000000L);
-		event.setStation(1);
+		event.setStation(station);
 		event.setNextStationId(2);
 		
 		String json = mapper.writeValueAsString(event);

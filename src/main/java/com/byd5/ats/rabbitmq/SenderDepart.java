@@ -15,18 +15,25 @@
  */
 package com.byd5.ats.rabbitmq;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import com.byd.ats.protocol.RabbConstant;
-import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
+import com.byd5.ats.message.ATSAlarmEvent;
+import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
+import com.byd5.ats.utils.RuntaskConstant;
 import com.byd5.ats.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,10 +43,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 
 /**
- * @author Gary Russell
- * @author Scott Deeg
+ * 运行任务发送消息
+ * @author wu.xianglan
  */
-public class SenderDepart {
+public class SenderDepart{
 	private final static Logger LOG = LoggerFactory.getLogger(SenderDepart.class);
 
 	@Value("${ats.serv.tag:0.0.0.0}")
@@ -53,10 +60,12 @@ public class SenderDepart {
 	private TopicExchange topic;
 
 	@Autowired
+	@Qualifier("topicATS2CU")
+	private TopicExchange exATS2CU;
+	
+	@Autowired
 	@Qualifier("topicServ2Cli")
 	private TopicExchange exServ2Cli;
-	
-	String realtimeKey = "serv2cli.trainruntask.realtime";
 	
 	//public final static String SERVID = "traindepart" + UUID.randomUUID().toString().replace("-", "");
 	public final static String SERVID = "traindepart(" + Utils.getLocalIP() + ")";
@@ -80,21 +89,33 @@ public class SenderDepart {
 	 * @param appDataATOCommand
 	 * @throws JsonProcessingException
 	 */
-	public void sendATOCommand(AppDataAVAtoCommand appDataAVAtoCommand) throws JsonProcessingException {
+	public void sendATOCommand(AppDataATOCommand appDataATOCommand) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		
 		String js = null;
 		
-		if(appDataAVAtoCommand != null){
-			js = objMapper.writeValueAsString(appDataAVAtoCommand);
+		if(appDataATOCommand != null){
+			/*LOG.info("[trace.station.enter] ATOCommand: next station [{}] section run time [{}s]"
+					+ "section stop time [{}s]", appDataATOCommand.getNextStationId()
+					, appDataATOCommand.getSectionRunLevel(), appDataATOCommand.getStationStopTime());*/
+			js = objMapper.writeValueAsString(appDataATOCommand);
 
 			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
-			//String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
-			template.convertAndSend(topic.getName(), RabbConstant.RABB_RK_AV_ATOCMD, js);
-			LOG.info("[departX] " + topic.getName() + ":" + RabbConstant.RABB_RK_AV_ATOCMD + " '" + js + "'");
+			String routeKey = RabbConstant.RABB_RK_AV_ATOCMD; //"ats2cu.vobc.command";
+			
+			if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+				template.convertAndSend(topic.getName(), routeKey, js);
+				LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+				template.convertAndSend(topic.getName(), routeKey, js);
+				LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+			}
+			
+			template.convertAndSend(topic.getName(), routeKey, js);
+			LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
 		}
+		
 	}
 	
 	/**
@@ -112,15 +133,29 @@ public class SenderDepart {
 		Map<String, Object> map = new HashMap<String, Object>();
 		
 		if(appDataStationTiming != null){
+			LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
+					+ appDataStationTiming.getStation_id() + "] section stop time ["
+					+ appDataStationTiming.getTime() + "s]");
+			
 			map.put("ats_station_timing", appDataStationTiming);
 			js = objMapper.writeValueAsString(map);
 			
 			
 			//js = objMapper.writeValueAsString(appDataStationTiming);
 			
-			template.convertAndSend(exServ2Cli.getName(), realtimeKey, js);
-			LOG.info("[departX] " + exServ2Cli.getName() + ":" + realtimeKey + " '" + js + "'");
+			template.convertAndSend(exServ2Cli.getName(), RuntaskConstant.RABB_RK_RUNTASK_REALTIME, js);
+			LOG.info("[departX] " + exServ2Cli.getName() + ":" + RuntaskConstant.RABB_RK_RUNTASK_REALTIME + " '" + js + "'");
 		}
 		
+	}
+	
+	/**
+	 * 给告警服务发送告警信息
+	 * @param alarmEvent
+	 */
+	public void senderAlarmEvent(String msg){
+		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(msg);
+		template.convertAndSend(RuntaskConstant.RABB_EX_DEPART, RuntaskConstant.RABB_RK_ALARM_ALERT, alarmEvent.toString());
+		LOG.error("[x] AlarmEvent: "+alarmEvent);
 	}
 }

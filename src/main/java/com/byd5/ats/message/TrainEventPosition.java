@@ -20,7 +20,6 @@ public class TrainEventPosition {
 	public short driverNum;// 司机号
 	public long timestamp;// 精确到ms
 	
-	
 	public String getServTag() {
 		return servTag;
 	}
@@ -129,6 +128,5 @@ public class TrainEventPosition {
 	public void setTimestamp(long timestamp) {
 		this.timestamp = timestamp;
 	}
-	
-	
+
 }
