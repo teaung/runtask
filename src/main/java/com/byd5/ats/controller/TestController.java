@@ -31,7 +31,7 @@ public class TestController{
 	public void stationEnter() throws JsonParseException, JsonMappingException, IOException{
 		event.setServiceNum((short) 1);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);
@@ -46,7 +46,7 @@ public class TestController{
 	public void stationArrive() throws JsonParseException, JsonMappingException, IOException{
 		event.setServiceNum((short) 1);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);
@@ -62,7 +62,7 @@ public class TestController{
 	public void returnLeave() throws Exception{
 		event.setServiceNum((short) 1);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);
@@ -78,7 +78,7 @@ public class TestController{
 	public void stationEnterUnplan() throws JsonParseException, JsonMappingException, IOException{
 		event.setServiceNum((short) 0);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);
@@ -93,7 +93,7 @@ public class TestController{
 	public void stationArriveUnplan() throws JsonParseException, JsonMappingException, IOException{
 		event.setServiceNum((short) 0);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);
@@ -109,7 +109,7 @@ public class TestController{
 	public void returnLeaveUnplan() throws Exception{
 		event.setServiceNum((short) 0);
 		event.setTrainNum((short) 102);
-		event.setCarNum((short) 103);
+		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setStation(1);
 		event.setNextStationId(2);

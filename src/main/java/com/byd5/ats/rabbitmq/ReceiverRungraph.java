@@ -22,6 +22,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
+import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.service.RunTaskService;
@@ -65,11 +66,16 @@ public class ReceiverRungraph {
 			Integer carNum = task.getTraingroupnum();
 			runTaskHandler.updateMapRuntask(carNum, task);
 			
+			// 检查该车是否有记录---2017-11-08
+			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+			
+			if(event != null){
 			// 向该车发送表号、车次号
 			AppDataAVAtoCommand appDataAVAtoCommand = null;
-			appDataAVAtoCommand = runTaskHandler.aodCmdReturn(task);
+			appDataAVAtoCommand = runTaskHandler.aodCmdReturn(event, task);
 			
 			sender.sendATOCommand(appDataAVAtoCommand);
+			}
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[rungraph runtask] parse data error!");
@@ -99,12 +105,17 @@ public class ReceiverRungraph {
 		
 		try{
 			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
-			
+			// 检查该车是否有记录---2017-11-08
+			Integer carNum = trainRunInfo.getTraingroupnum();
+			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+						
+			if(event != null){
 			// 向该车发送表号、车次号
 			AppDataAVAtoCommand appDataAVAtoCommand = null;
-			appDataAVAtoCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
+			appDataAVAtoCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
 			
 			sender.sendATOCommand(appDataAVAtoCommand);
+			}
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[rungraph RunInfo] parse data error!");
@@ -138,12 +149,17 @@ public class ReceiverRungraph {
 			if(task != null){
 				runTaskHandler.updateMapRuntask(carNum, task);
 				
+				// 检查该车是否有记录---2017-11-08
+				TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+							
+				if(event != null){
 				// 向该车发送表号、车次号
 				AppDataAVAtoCommand appDataAVAtoCommand = null;
 				TrainRunInfo trainRunInfo = new TrainRunInfo();
 				BeanUtils.copyProperties(task, trainRunInfo);
-				appDataAVAtoCommand = runTaskHandler.aodCmdTransform(trainRunInfo);
+				appDataAVAtoCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
 				sender.sendATOCommand(appDataAVAtoCommand);
+				}
 			}
 			
 		}catch (Exception e) {

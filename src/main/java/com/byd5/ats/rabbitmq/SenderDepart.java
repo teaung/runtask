@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import com.byd.ats.protocol.RabbConstant;
 import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
@@ -50,10 +52,6 @@ public class SenderDepart {
 	@Qualifier("exchangeDepart")
 	private TopicExchange topic;
 
-	@Autowired
-	@Qualifier("topicATS2CU")
-	private TopicExchange exATS2CU;
-	
 	@Autowired
 	@Qualifier("topicServ2Cli")
 	private TopicExchange exServ2Cli;
@@ -93,11 +91,10 @@ public class SenderDepart {
 			js = objMapper.writeValueAsString(appDataAVAtoCommand);
 
 			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
-			String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
-			template.convertAndSend(topic.getName(), routeKey, js);
-			LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+			//String routeKey = "ats.traindepart.aod.command"; //"ats2cu.vobc.command";
+			template.convertAndSend(topic.getName(), RabbConstant.RABB_RK_AV_ATOCMD, js);
+			LOG.info("[departX] " + topic.getName() + ":" + RabbConstant.RABB_RK_AV_ATOCMD + " '" + js + "'");
 		}
-		
 	}
 	
 	/**

@@ -16,8 +16,10 @@ import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
+import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 列车运行任务处理类
@@ -30,6 +32,10 @@ public class RunTaskService {
 
 	@Autowired
 	private TraincontrolHystrixService traincontrolHystrixService;
+	@Autowired
+	private TrainrungraphHystrixService trainrungraphHystrixService;
+	@Autowired
+	private RunTaskService runTaskService;
 	
 	/**
 	 * 运行任务map：以车组号为key，TrainRunTask类为value
@@ -48,13 +54,15 @@ public class RunTaskService {
 	
 	/**
 	 * 当列车到达折返时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
+	 * @param event 
 	 * @param task
 	 * @return
 	 */
-	public AppDataAVAtoCommand aodCmdReturn(TrainRunTask task) throws Exception {
+	public AppDataAVAtoCommand aodCmdReturn(TrainEventPosition event, TrainRunTask task) throws Exception {
 		LOG.info("--达折返aodCmdReturn--start");
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
+		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();//------------是否接收折返轨位置信息？
 
+		cmd.setReserved((int) event.getSrc());	//添加车辆vid
 		cmd.setServiceNum((short) task.getTablenum());
 		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
 		cmd.setNextZcId(0);//0xffffffff
@@ -160,6 +168,7 @@ public class RunTaskService {
 			timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
 			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 
+			cmd.setReserved((int) event.getSrc());	//添加车辆vid
 			cmd.setServiceNum((short) task.getTablenum());
 			cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
 			cmd.setNextZcId(0);
@@ -385,20 +394,21 @@ public class RunTaskService {
 
 		int timeStationStop = 30; // 当前车站站停时间（单位：秒）
 		
+		cmd.setReserved((int) event.getSrc());	//添加车辆vid
 		cmd.setServiceNum((short) 0xFF);
 		cmd.setLineNum((short) 64); // ??? need rungraph supply!
 		cmd.setNextZcId(0);
 		cmd.setNextCiId(0);
 		cmd.setNextAtsId(0);
 		cmd.setCargroupLineNum((short) 64);
-		cmd.setCargroupNum(event.getCarNum());
+		cmd.setCargroupNum(event.getCargroupNum());
 		cmd.setSrcLineNum((short) 64); // ??? need rungraph supply!
 		cmd.setTrainNum((short) 0000);
 		cmd.setDstLineNum((short) 64); // ??? need rungraph supply!
 		
 //		cmd.setDstCode(String.valueOf(0xFFFF));
 		cmd.setDstCode(0xFFFF);
-		cmd.setPlanDir((short) ((event.getDirectionPlan()==0)?0xAA:0x55)); 
+		cmd.setPlanDir((short) ((event.getTrainDir()==0)?0xAA:0x55)); 
 		
 		cmd.setSkipPlatformId(0xFFFF);
 		cmd.setNextSkipCmd((short) 0xAA);
@@ -456,13 +466,15 @@ public class RunTaskService {
 	
 	/**
 	 * 当列车到达转换轨时，收到运行图发来的运行信息，根据车次时刻表向VOBC发送任务命令（表号、车组号、车次号信息）
+	 * @param event 
 	 * @param task
 	 * @return
 	 */
-	public AppDataAVAtoCommand aodCmdTransform(TrainRunInfo trainRunInfo) throws Exception {
+	public AppDataAVAtoCommand aodCmdTransform(TrainEventPosition event, TrainRunInfo trainRunInfo) throws Exception {
 		LOG.info("--aodCmdTransform--start");
 		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 
+		cmd.setReserved((int) event.getSrc());	//添加车辆vid
 		cmd.setServiceNum((short) trainRunInfo.getTablenum());
 		cmd.setLineNum((short) trainRunInfo.getLineNum()); // ??? need rungraph supply!
 		cmd.setNextZcId(0);//0xffffffff
@@ -534,6 +546,43 @@ public class RunTaskService {
 	public void clearMapRuntask(Integer carNum, short tablenum){
 		if (tablenum == 0) {//非计划车，则移除
 			mapRunTask.remove(carNum);
+		}
+	}
+	
+	/**
+	 * 根据车组号、表号和车次号获取列车运行任务信息
+	 * @param carNum
+	 * @param tablenum
+	 * @param trainnum
+	 */
+	public void getRuntask(int carNum, short tablenum, short trainnum) throws JsonParseException, JsonMappingException, IOException{
+		ObjectMapper objMapper = new ObjectMapper();
+		if((mapRunTask.size() == 0 && tablenum != 0
+			|| mapRunTask.size() > 0 && mapRunTask.containsKey(carNum)
+			&& mapRunTask.get(carNum).getTrainnum()!= trainnum && tablenum != 0) //&& !"ZH".equals(dsStationNum)
+			){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
+			//if(tablenum != 0){
+				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
+				if(resultMsg != null && !resultMsg.equals("error")){
+					TrainRunTask newtask = null;
+					try{
+						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+					}catch (Exception e) {
+						LOG.error("[trace.station.enter] runtask parse error!");
+						//e.printStackTrace();
+					}
+					if (!mapRunTask.containsKey(carNum)) {
+						runTaskService.mapRunTask.put(carNum, newtask);
+					}
+					else {
+						mapRunTask.replace(carNum, newtask);
+					}
+				}else if(resultMsg == null){
+					//需要发报警信息
+					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
+					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
+				}
+			//}
 		}
 	}
 }

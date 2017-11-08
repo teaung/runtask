@@ -77,25 +77,25 @@ public class ReceiverTrace {
 		event = objMapper.readValue(in, TrainEventPosition.class);
 		
 		// 检查该车是否有记录
-		Integer carNum = (int) event.getCarNum();
+		Integer carNum = (int) event.getCargroupNum();
 		
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
-		String dsStationNum = event.getDstStationNum();
+		String dsStationNum = event.getDstCode();
 		
-		//-------------获取或 更新运行图任务信息
+		//-------------(1)添加列车到站信息
+		runTaskService.updateMapTrace(carNum, event);
+				
+		//-------------(2)清除计划车运行图任务信息(非计划车)
 		runTaskService.clearMapRuntask(carNum, tablenum);//非计划车时，移除残留的计划车运行任务信息
-		getRuntask(carNum, tablenum, trainnum, dsStationNum);
 		
+		//-------------(3)根据车组号、表号和车次号获取列车运行任务信息
+		runTaskService.getRuntask(carNum, tablenum, trainnum);
 		TrainRunTask task = runTaskService.getMapRuntask(carNum);
 		
-		//添加列车到站信息
-		runTaskService.updateMapTrace(carNum, event);
-		
-		//---------------停站时间列表为空，则查询数据库获取--------------
+		//-------------(4)停站时间列表为空，则查询数据库获取--------------
 		if(runTaskService.mapDwellTime.size() == 0){
 			try{
-				//String resultMsg = restTemplate.getForObject("http://serv31-trainrungraph/server/getRuntaskAllCommand", String.class);
 				String resultMsg = trainrungraphHystrixService.getDwellTime();
 				if(resultMsg != null && !resultMsg.equals("error")){
 					List<AppDataDwellTimeCommand> dataList = objMapper.readValue(resultMsg, new TypeReference<List<AppDataDwellTimeCommand>>() {}); // json转换成map
@@ -113,41 +113,27 @@ public class ReceiverTrace {
 		}
 		
 		
-		// 向该车发送站间运行等级
-		AppDataAVAtoCommand appDataAVAtoCommand = null;
+		AppDataAVAtoCommand appDataAVAtoCommand = null;//ATO命令
 
 		if (task != null) {//计划车
 			appDataAVAtoCommand = runTaskService.aodCmdEnter(task, event);
-			LOG.info("[trace.station.enter] ATOCommand: next station ["
-					+ appDataAVAtoCommand.getNextStopPlatformId() + "] section run time ["
-					+ appDataAVAtoCommand.getSectionRunAdjustCmd()+ "s]"
-					+ "section stop time ["+ appDataAVAtoCommand.getPlatformStopTime()
-					+ "s]");
 			
 			if(appDataAVAtoCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
 				sender.sendATOCommand(appDataAVAtoCommand);
 				sender.sendATOCommand(appDataAVAtoCommand);
 			}
 			sender.sendATOCommand(appDataAVAtoCommand);
+			LOG.info("[trace.station.enter] ATOCommand: next station ["
+					+ appDataAVAtoCommand.getNextStopPlatformId() + "] section run time ["
+					+ appDataAVAtoCommand.getSectionRunAdjustCmd()+ "s]"
+					+ "section stop time ["+ appDataAVAtoCommand.getPlatformStopTime()
+					+ "s]");
 		}
 		else {//非计划车到站时的处理
 			LOG.info("[trace.station.enter] unplanTrain----");
 			//appDataATOCommand = runTaskService.aodCmdEnterUnplan(event);
-			LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
+			LOG.info("[trace.station.enter] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}
-		
-		/*LOG.info("[trace.station.enter] ATOCommand: next station ["
-				+ appDataATOCommand.getNextStationId() + "] section run time ["
-				+ appDataATOCommand.getSectionRunLevel()+ "s]"
-				+ "section stop time ["+ appDataATOCommand.getStationStopTime()
-				+ "s]");
-		
-		
-		if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
-			sender.sendATOCommand(appDataATOCommand);
-			sender.sendATOCommand(appDataATOCommand);
-		}
-		sender.sendATOCommand(appDataATOCommand);*/
 		
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -167,28 +153,26 @@ public class ReceiverTrace {
 		LOG.info("[trace.station.arrive] '" + in + "'");
 		TrainEventPosition event = null;
 		ObjectMapper objMapper = new ObjectMapper();
-		
-		//反序列化
-		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
-		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
 		event = objMapper.readValue(in, TrainEventPosition.class);
 		
 		// 检查该车是否有记录
-		Integer carNum = (int) event.getCarNum();
+		Integer carNum = (int) event.getCargroupNum();
 		
-		//添加列车到站信息
-		runTaskService.updateMapTrace(carNum, event);
 				
 		short tablenum = event.getServiceNum();
 		short trainnum = event.getTrainNum();
-		String dsStationNum = event.getDstStationNum();
+		String dsStationNum = event.getDstCode();
 		
-		//-------获取或 更新运行图任务信息
-		runTaskService.clearMapRuntask(carNum, tablenum);
-		getRuntask(carNum, tablenum, trainnum, dsStationNum);
-		
+		// -------------(1)添加列车到站信息
+		runTaskService.updateMapTrace(carNum, event);
+
+		// -------------(2)清除计划车运行图任务信息(非计划车)
+		runTaskService.clearMapRuntask(carNum, tablenum);// 非计划车时，移除残留的计划车运行任务信息
+
+		// -------------(3)根据车组号、表号和车次号获取列车运行任务信息
+		runTaskService.getRuntask(carNum, tablenum, trainnum);
 		TrainRunTask task = runTaskService.getMapRuntask(carNum);
 		
 		// 向客户端发送站停时间
@@ -196,13 +180,12 @@ public class ReceiverTrace {
 
 		if (task != null) {
 			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
+			sender.senderAppDataStationTiming(appDataStationTiming);
 			
 			LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
 					+ appDataStationTiming.getStation_id() + "] section stop time ["
 					+ appDataStationTiming.getTime()
 					+ "s]");
-			
-			sender.senderAppDataStationTiming(appDataStationTiming);
 		}
 		else {
 			LOG.info("[trace.station.arrive] unplanTrain----");
@@ -211,17 +194,40 @@ public class ReceiverTrace {
 			//LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 		}		
 		
-		/*LOG.info("[trace.station.arrive] AppDataTimeStationStop: this station ["
-				+ appDataStationTiming.getStation_id() + "] section stop time ["
-				+ appDataStationTiming.getTime()
-				+ "s]");
-		
-		sender.senderAppDataStationTiming(appDataStationTiming);*/
-		
 		watch.stop();
 		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
+	
+	/**
+	 * 列车到达转换轨时，保存列车位置信息
+	 * @param in
+	 * @throws Exception 
+	 */
+	@RabbitListener(queues = "#{queueTraceTransformArrive.name}")
+	public void receiveTraceTransformArrive(String in) throws Exception {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[trace.transform.arrive] '" + in + "'");
+		
+		ObjectMapper objMapper = new ObjectMapper();
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		try{
+			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+			Integer carNum = (int) event.getCargroupNum();
+			
+			//添加列车到站信息
+			runTaskService.updateMapTrace(carNum , event);
+			
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[trace.transform.arrive] 消息处理出错!");
+		}
+		
+		watch.stop();
+		LOG.info("[trace.transform.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
 	
 	/**
 	 * 离开折返轨消息处理(列车换端时，给尾端发送的AOD命令)：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
@@ -234,44 +240,36 @@ public class ReceiverTrace {
 		watch.start();
 		LOG.info("[trace.return.leave] '" + in + "'");
 		
-		ObjectMapper objMapper = new ObjectMapper();
 		TrainEventPosition returnLeaveEvent = null;
-		
-		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
 		try{
 			returnLeaveEvent = objMapper.readValue(in, TrainEventPosition.class);
 			
-			Integer carNum = (int) returnLeaveEvent.getCarNum();
+			Integer carNum = (int) returnLeaveEvent.getCargroupNum();
 			short tablenum = returnLeaveEvent.getServiceNum();
 			short trainnum = returnLeaveEvent.getTrainNum();
-			String dsStationNum = returnLeaveEvent.getDstStationNum();
+			String dsStationNum = returnLeaveEvent.getDstCode();
 			
 			if(tablenum != 0){
 				//获取当前车组号对应的运行任务
 				//------------获取或 更新运行图任务信息
 				runTaskService.clearMapRuntask(carNum, tablenum);
-				getRuntask(carNum, tablenum, trainnum, dsStationNum);
+				runTaskService.getRuntask(carNum, tablenum, trainnum);
 				
 				TrainRunTask task = runTaskService.getMapRuntask(carNum);
 				
 				if(task != null){
 					// 向该车发送表号、车次号
 					AppDataAVAtoCommand appDataAVAtoCommand = null;
-					appDataAVAtoCommand = runTaskService.aodCmdReturn(task);
+					appDataAVAtoCommand = runTaskService.aodCmdReturn(returnLeaveEvent, task);
 					sender.sendATOCommand(appDataAVAtoCommand);
 				}
-				/*else{
-					//需要发报警信息
-					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
-					LOG.error("[trace.return.leave] serv31-trainrungraph fallback runtask is null!");
-				}*/
 			}
 			else{
 				LOG.info("[trace.return.leave] unplanTrain--------");
-				//AppDataATOCommand appDataATOCommand = null;
-				//appDataATOCommand = runTaskService.aodCmdEnterUnplan(returnLeaveEvent);
+				//AppDataATOCommand appDataATOCommand = runTaskService.aodCmdEnterUnplan(returnLeaveEvent);
 				//sender.sendATOCommand(appDataATOCommand);
 				LOG.info("[trace.station.arrive] not find the car (" + carNum + ") in runTask list, so do nothing.");
 			}
@@ -284,44 +282,4 @@ public class ReceiverTrace {
 		LOG.info("[trace.return.leave] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
-	
-	/**
-	 * 根据车组号、表号和车次号获取列车运行任务信息
-	 * @param carNum
-	 * @param tablenum
-	 * @param trainnum
-	 * @throws IOException 
-	 * @throws JsonMappingException 
-	 * @throws JsonParseException 
-	 */
-	public void getRuntask(int carNum, short tablenum, short trainnum, String dsStationNum) throws JsonParseException, JsonMappingException, IOException{
-		ObjectMapper objMapper = new ObjectMapper();
-		if((runTaskService.mapRunTask.size() == 0 && tablenum != 0
-			|| runTaskService.mapRunTask.size() > 0 && runTaskService.mapRunTask.containsKey(carNum)
-			&& runTaskService.mapRunTask.get(carNum).getTrainnum()!= trainnum && tablenum != 0) //&& !"ZH".equals(dsStationNum)
-			){//任务列表为空，且该车为计划车时，从运行图服务中获取任务列表
-			//if(tablenum != 0){
-				String resultMsg = trainrungraphHystrixService.getRuntask(carNum, tablenum, trainnum);
-				if(resultMsg != null && !resultMsg.equals("error")){
-					TrainRunTask newtask = null;
-					try{
-						newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
-					}catch (Exception e) {
-						LOG.error("[trace.station.enter] runtask parse error!");
-						//e.printStackTrace();
-					}
-					if (!runTaskService.mapRunTask.containsKey(carNum)) {
-						runTaskService.mapRunTask.put(carNum, newtask);
-					}
-					else {
-						runTaskService.mapRunTask.replace(carNum, newtask);
-					}
-				}else if(resultMsg == null){
-					//需要发报警信息
-					trainrungraphHystrixService.senderAlarmEvent("没有找到车组号为:"+carNum+"表号为:"+tablenum+"车次号为:"+trainnum+"的运行任务");
-					LOG.error("[trace.station.enter] serv31-trainrungraph fallback runtask is null!");
-				}
-			//}
-		}
-	}
 }
