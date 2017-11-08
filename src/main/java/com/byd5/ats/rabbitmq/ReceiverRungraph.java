@@ -21,7 +21,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import com.byd5.ats.message.AppDataATOCommand;
+
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
@@ -68,7 +69,7 @@ public class ReceiverRungraph {
 			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
 			if(event != null){
 			// 向该车发送表号、车次号
-			AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdReturn(event, task);
+				AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdReturn(event, task);
 			
 			sender.sendATOCommand(appDataATOCommand);
 			}
@@ -107,7 +108,7 @@ public class ReceiverRungraph {
 			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
 			if(event != null){
 			// 向该车发送表号、车次号
-			AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
+			AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
 			
 			sender.sendATOCommand(appDataATOCommand);
 			}
@@ -151,7 +152,7 @@ public class ReceiverRungraph {
 				// 检查该车是否有记录----2017-11-08
 				TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
 				if(event != null){
-				AppDataATOCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
+				AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
 				sender.sendATOCommand(appDataATOCommand);
 				}
 			}

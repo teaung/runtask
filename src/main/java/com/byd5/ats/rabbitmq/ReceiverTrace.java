@@ -6,7 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import com.byd5.ats.message.AppDataATOCommand;
+
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
@@ -56,7 +57,7 @@ public class ReceiverTrace {
 		TrainRunTask task = runTaskService.getMapRuntask(event);
 		
 		// 向该车发送站间运行等级
-		AppDataATOCommand appDataATOCommand = null;
+		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event.getServiceNum() != 0 && task != null){//计划车
 			appDataATOCommand = runTaskService.aodCmdEnter(task, event);
 		}
@@ -123,7 +124,7 @@ public class ReceiverTrace {
 			TrainRunTask task = runTaskService.getMapRuntask(event);
 			
 			if(event.getServiceNum() != 0 && task != null){//计划车
-				AppDataATOCommand appDataATOCommand = runTaskService.aodCmdReturn(event, task);
+				AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdReturn(event, task);
 				sender.sendATOCommand(appDataATOCommand);
 			}
 			

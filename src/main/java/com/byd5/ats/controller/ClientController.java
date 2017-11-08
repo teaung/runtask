@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import com.byd5.ats.message.AppDataATOCommand;
+
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.BackDwellTime2AppData;
@@ -167,7 +168,7 @@ public class ClientController{
 			}
 			
 			// 向该车发送站间运行等级
-			AppDataATOCommand appDataATOCommand = null;
+			AppDataAVAtoCommand appDataATOCommand = null;
 			AppDataStationTiming appDataStationTiming = null;
 
 			if (task != null && event != null && event.getStation() == platformId) {
@@ -177,7 +178,7 @@ public class ClientController{
 				//-------------------给客户端发停站时间0----------------
 				appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
 				
-				appDataATOCommand.setStationStopTime(0x0001);//停站时间设为0，即立即发车
+				appDataATOCommand.setPlatformStopTime(0x0001);//停站时间设为0，即立即发车
 				appDataStationTiming.setTime(0x0001);
 				
 				//---------------发送消息--------------------------

@@ -29,8 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import com.byd.ats.protocol.RabbConstant;
+import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.ATSAlarmEvent;
-import com.byd5.ats.message.AppDataATOCommand;
 import com.byd5.ats.message.AppDataStationTiming;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.utils.RuntaskConstant;
@@ -89,7 +89,7 @@ public class SenderDepart{
 	 * @param appDataATOCommand
 	 * @throws JsonProcessingException
 	 */
-	public void sendATOCommand(AppDataATOCommand appDataATOCommand) throws JsonProcessingException {
+	public void sendATOCommand(AppDataAVAtoCommand appDataATOCommand) throws JsonProcessingException {
 		
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
@@ -105,7 +105,7 @@ public class SenderDepart{
 			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
 			String routeKey = RabbConstant.RABB_RK_AV_ATOCMD; //"ats2cu.vobc.command";
 			
-			if(appDataATOCommand.getSkipNextStation() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+			if(appDataATOCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
 				template.convertAndSend(topic.getName(), routeKey, js);
 				LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
 				template.convertAndSend(topic.getName(), routeKey, js);
