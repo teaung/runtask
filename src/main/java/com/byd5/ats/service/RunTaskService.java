@@ -1,6 +1,7 @@
 package com.byd5.ats.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.AppDataDwellTimeCommand;
 import com.byd5.ats.message.AppDataStationTiming;
@@ -56,6 +56,20 @@ public class RunTaskService{
 	public Map<Integer, AppDataDwellTimeCommand> mapDwellTime = new HashMap<Integer, AppDataDwellTimeCommand>();
 	
 	/**
+	 * 车站扣车状态列表
+	 */
+	public List<Byte> listDtStatus = new ArrayList<Byte>();
+	
+	public RunTaskService()
+	{
+		for(int i=0;i<8;i++)
+		{
+			this.listDtStatus.add((byte) 3);//初始化扣车状态数组大小，默认扣车状态为3，未扣车
+		}
+		
+	}
+	
+	/**
 	 * 当列车到达折返时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
 	 * @param event 
 	 * @param task
@@ -82,8 +96,8 @@ public class RunTaskService{
 		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
 		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
 		
-		//cmd.setDstCode(endPlatformId);
-		cmd.setDstCode(lastStation.getPlatformId());
+		cmd.setDstCode(endPlatformId.toCharArray());
+//		cmd.setDstCode(lastStation.getPlatformId());
 		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一停车站台ID
@@ -92,8 +106,17 @@ public class RunTaskService{
 		
 		//(下一站有跳停)设置下一停车站台ID、区间运行时间
 		cmd = setNextStopStation(cmd, first, timetableList);
+		//有扣车，设置扣车命令
+		cmd = setDtCmd(cmd);
 		
 		LOG.info("--到达折返轨aodCmdReturn--end");
+		return cmd;
+	}
+
+	private AppDataAVAtoCommand setDtCmd(AppDataAVAtoCommand cmd) {
+		if(cmd.getNextStopPlatformId() != 65535 && listDtStatus.get(cmd.getNextStopPlatformId()-1) < 3){
+			cmd.setDetainCmd((short) 0x55);
+		}
 		return cmd;
 	}
 	
@@ -141,7 +164,7 @@ public class RunTaskService{
 			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
 			String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
 			
-			cmd.setDstCode(lastStation.getPlatformId());
+			cmd.setDstCode(endPlatformId.toCharArray());
 			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 			
 			//若当前车站是终点站，则只发当前车站站停时间
@@ -180,6 +203,8 @@ public class RunTaskService{
 			return null;
 		}
 		
+		//有扣车，设置扣车命令
+		cmd = setDtCmd(cmd);
 		
 		LOG.info("--aodCmdEnter--end");		
 		return cmd;
@@ -279,7 +304,7 @@ public class RunTaskService{
 		cmd.setServiceNum((short) 0xFF);
 		cmd.setLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
 		cmd.setCargroupLineNum(RuntaskConstant.NID_LINE);
-		cmd.setCargroupNum(event.getCargroupNum());
+		cmd.setCargroupNum((short) event.getCargroupNum());
 		cmd.setSrcLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
 		cmd.setTrainNum((short) 0000);
 		cmd.setDstLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
@@ -297,6 +322,9 @@ public class RunTaskService{
 		
 		Integer nextPlatformId = event.getNextStationId();
 		cmd.setNextStopPlatformId(nextPlatformId);
+		
+		//有扣车，设置扣车命令
+		cmd = setDtCmd(cmd);
 		
 		LOG.info("--aodCmdEnterUnplan--end");
 		return cmd;
@@ -325,12 +353,15 @@ public class RunTaskService{
 		cmd.setTrainNum((short) trainRunInfo.getTrainnum());
 		cmd.setDstLineNum((short) trainRunInfo.getLineNum()); // ??? need rungraph supply!
 		
-		cmd.setDstCode(0);	//填啥？
+		//cmd.setDstCode(0);	//填啥？
 		cmd.setPlanDir((short) ((trainRunInfo.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
 		cmd.setNextSkipCmd((short) 0xAA);
 		cmd.setSectionRunAdjustCmd((short) 0);//?
+		
+		//有扣车，设置扣车命令
+		cmd = setDtCmd(cmd);
 
 		LOG.info("--aodCmdTransform--end");
 		return cmd;
@@ -341,7 +372,7 @@ public class RunTaskService{
 		Integer result = null;
 		if(mapDwellTime.containsKey(platformId)){
 			AppDataDwellTimeCommand dwellTimeCommand = mapDwellTime.get(platformId);
-			if(dwellTimeCommand.getSetWay() == 0){//0为人工设置
+			if(dwellTimeCommand != null && dwellTimeCommand.getSetWay() == 0){//0为人工设置
 				//result.setStationStopTime(dwellTimeCommand.getTime());//设置停站时间
 				result = dwellTimeCommand.getTime();
 			}
@@ -518,6 +549,9 @@ public class RunTaskService{
 					e.printStackTrace();
 				}
 			}
+			else{
+				LOG.error("获取运行任务失败，不存在");
+			}
 		}
 		else{
 			return getRuntask(carNum);//返回已存在的运行任务信息
@@ -560,14 +594,15 @@ public class RunTaskService{
 		cmd.setSrcLineNum(0xFF);
 		cmd.setTrainNum((short) 0xFF);
 		cmd.setDstLineNum(0xFF);
-		cmd.setDstCode(0xFFFF);
+		char[] dstCode = {'\u0000','\u0000','\u0000','\u0000'};
+		cmd.setDstCode(dstCode);//0xFFFF
 		cmd.setPlanDir((short) 0xFF);
 		cmd.setNextStopPlatformId(0xFFFF);
 		cmd.setPlatformStopTime(0xFFFF);
 		cmd.setSkipPlatformId(0xFFFF);
 		cmd.setNextSkipCmd((short) 0xFF);
 		cmd.setSectionRunAdjustCmd((short) 0);
-		cmd.setDetainCmd((short) 0);
+		cmd.setDetainCmd((short) 0xAA);
 		cmd.setTurnbackCmd((short) 0);
 		cmd.setBackDepotCmd((short) 0);
 		cmd.setDoorctrlStrategy((short) 0xFF);

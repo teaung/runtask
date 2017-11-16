@@ -5,7 +5,7 @@
 
 	<groupId>com.byd5.ats</groupId>
 	<artifactId>serv39-trainruntask</artifactId>
-	<version>0.5.6</version>
+	<version>0.6.0</version>
 	<packaging>jar</packaging>
 
 	<name>serv39-trainruntask</name>
@@ -60,7 +60,7 @@
 		<dependency>
 			<groupId>com.byd.ats</groupId>
 			<artifactId>lib01-protocol-ats2ext</artifactId>
-			<version>0.1.1</version>
+			<version>0.1.2</version>
 		</dependency>
 
 		<dependency>

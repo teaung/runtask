@@ -36,7 +36,7 @@ public class TrainrungraphHystrixService {
 	
 	public String fallbackGetDwellTime(){
 		sender.senderAlarmEvent("获取站台停站时间失败，运行图服务故障!");
-		logger.error("[getAllStopTime] serv31-trainrungraph can't connetc, or runtask parse error!");
+		logger.error("[getAllStopTime] serv31-trainrungraph can't connect!");
 		return "error";
 	}
 	
