@@ -55,9 +55,9 @@ public class SenderDepart{
 	@Autowired
 	private RabbitTemplate template;
 
-	@Autowired
+	/*@Autowired
 	@Qualifier("exchangeDepart")
-	private TopicExchange topic;
+	private TopicExchange topic;*/
 
 	@Autowired
 	@Qualifier("topicATS2CU")
@@ -80,8 +80,8 @@ public class SenderDepart{
 		js = objMapper.writeValueAsString(table);
 		
 		String routeKey = "ats.traindepart.timetable";
-		template.convertAndSend(topic.getName(), routeKey, js);
-		LOG.debug("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+		template.convertAndSend(exATS2CU.getName(), routeKey, js);
+		LOG.debug("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 	}
 	
 	/**
@@ -106,14 +106,14 @@ public class SenderDepart{
 			String routeKey = RabbConstant.RABB_RK_AV_ATOCMD; //"ats2cu.vobc.command";
 			
 			if(appDataATOCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
-				template.convertAndSend(topic.getName(), routeKey, js);
-				LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
-				template.convertAndSend(topic.getName(), routeKey, js);
-				LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+				template.convertAndSend(exATS2CU.getName(), routeKey, js);
+				LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
+				template.convertAndSend(exATS2CU.getName(), routeKey, js);
+				LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 			}
 			
-			template.convertAndSend(topic.getName(), routeKey, js);
-			LOG.info("[departX] " + topic.getName() + ":" + routeKey + " '" + js + "'");
+			template.convertAndSend(exATS2CU.getName(), routeKey, js);
+			LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 		}
 		
 	}

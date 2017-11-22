@@ -54,9 +54,16 @@ public class ClientController{
 		String result = null;
 		ObjectMapper mapper = new ObjectMapper();
 		BackDwellTime2AppData BackDwellTime2AppData = null;
-		
 		//反序列化
 		mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		/*AppDataDwellTimeCommand dwellTimeCommand = new AppDataDwellTimeCommand();
+		dwellTimeCommand.setPlatformId(1);
+		dwellTimeCommand.setSetWay(1);
+		dwellTimeCommand.setRuntaskCmdType((short) 114);
+		dwellTimeCommand.setTime(50);
+		Integer runtaskCmdType = 114;*/
+		
 		LOG.info("--receive--"+json);
 		//try {
 			
