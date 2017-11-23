@@ -90,7 +90,7 @@ public class ReceiverTrace {
 			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
 		}		
 		
-		if(event.getServiceNum() != 0){//非计划车
+		if(event.getServiceNum() == 0){//非计划车
 			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
 		}
 		

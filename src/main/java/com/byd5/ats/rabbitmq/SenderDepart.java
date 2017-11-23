@@ -155,7 +155,7 @@ public class SenderDepart{
 	 */
 	public void senderAlarmEvent(String msg){
 		ATSAlarmEvent alarmEvent = new ATSAlarmEvent(msg);
-		template.convertAndSend(RuntaskConstant.RABB_EX_DEPART, RuntaskConstant.RABB_RK_ALARM_ALERT, alarmEvent.toString());
+		//template.convertAndSend(RuntaskConstant.RABB_EX_DEPART, RuntaskConstant.RABB_RK_ALARM_ALERT, alarmEvent.toString());
 		LOG.error("[x] AlarmEvent: "+alarmEvent);
 	}
 }
