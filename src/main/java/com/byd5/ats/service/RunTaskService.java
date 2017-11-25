@@ -89,17 +89,18 @@ public class RunTaskService{
 		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
 		cmd.setTrainNum(task.getTrainnum());
 		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-		
-		/**当前车次对应的时刻表信息*/
+
+		/** 当前车次对应的时刻表信息 */
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-		/**当前车次的起始站信息*/
-		TrainRunTimetable first = timetableList.get(1);//第二条数据为车站数据
-		/**当前车次的终点站信息*/
-		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
-		
+		/** 当前车次的起始站信息 */
+		TrainRunTimetable first = timetableList.get(1);// 第二条数据为车站数据
+		/** 当前车次的终点站信息 */
+		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);// 最后一条数据为车站数据
+
 		/**设置目的地号为终点站站台ID*/
 		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-		cmd = setDstCode(task.getDstStationNum(), cmd);
+		//cmd = convertDstCode2Char(task.getDstStationNum(), cmd);
+		cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
 		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		/**下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件： 1、有人工设置跳停命令 2、或者运行计划有跳停*/
@@ -114,15 +115,96 @@ public class RunTaskService{
 		LOG.info("--到达折返轨aodCmdReturn--end");
 		return cmd;
 	}
+	
+	
+	/**
+	 * 在区间上升级为通信车，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
+	 * @param event 列车位置信息
+	 * @param task	运行任务信息
+	 * @return ATO命令信息
+	 */
+	public AppDataAVAtoCommand aodCmdSection(TrainEventPosition event, TrainRunTask task) {
+		LOG.info("--aodCmdSection--start");
+		/**ATO命令信息*/
+		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
+
+		/**初始化ATO命令数据为默认值*/
+		cmd = initAtoCommand(cmd);//初始化ATO命令数据
+		
+		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
+		cmd.setServiceNum(task.getTablenum());
+		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
+		cmd.setCargroupLineNum(task.getLineNum());
+		cmd.setCargroupNum(task.getTraingroupnum());
+		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
+		cmd.setTrainNum(task.getTrainnum());
+		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
+
+		Integer nextPlatformId = event.getNextStationId();
+		/*if(event.getNextStationId() == 10){//下一站转换轨
+			nextPlatformId = 0;
+		}
+		
+		if(event.getNextStationId() == 9){//下一站折返轨
+			nextPlatformId = 9;
+		}*/
+		
+		/** 当前车次对应的时刻表信息 */
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
+		
+		/**当前车次的当前站台信息*/
+		TrainRunTimetable currStation = null;
+		
+		/**当前车次的下一站台信息*/
+		TrainRunTimetable nextStation = null;
+		
+		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
+		for (int i = 0; i < timetableList.size(); i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+			TrainRunTimetable t = timetableList.get(i);
+			if (t.getPlatformId() == nextPlatformId) {
+				/*currStation = t;
+				nextStation = timetableList.get(i+1);*/
+				nextStation = t;
+				break;
+			}
+		}
+		
+		
+		/** 当前车次的起始站信息 */
+		TrainRunTimetable first = timetableList.get(1);// 第二条数据为车站数据
+		/** 当前车次的终点站信息 */
+		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);// 最后一条数据为车站数据
+
+		/**设置目的地号为终点站站台ID*/
+		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
+		//cmd = convertDstCode2Char(task.getDstStationNum(), cmd);
+		cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
+		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
+		
+		if(nextPlatformId != 0){
+			/**下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件： 1、有人工设置跳停命令 2、或者运行计划有跳停*/
+			cmd = nextStaionSkipStatusProccess(cmd, nextStation);
+			
+			/**(下一站有跳停)设置下一停车站台ID、区间运行时间*/
+			cmd = setNextStopStation(cmd, nextStation, timetableList);
+		}
+		
+		
+		/**有扣车，设置扣车命令*/
+		cmd = setDtCmd(cmd);
+		
+		LOG.info("--aodCmdSection--end");
+		return cmd;
+	}
+	
 
 	/**
 	 * 设置目的地号: 类型转换String->char[]
 	 * 
 	 * @param dstStationNum 运行图目的地号
-	 * @param cmd ATO命令信息
-	 * @return ATO命令信息
+	 * @return 转换后的目的地号
 	 */
-	private AppDataAVAtoCommand setDstCode(String dstStationNum, AppDataAVAtoCommand cmd) {
+	private char[] convertDstCode2Char(String dstStationNum) {
 		int len = 4;
 		char[] code = {' ', ' ', ' ', ' '};
 		char[] dst = dstStationNum.toCharArray();
@@ -132,8 +214,8 @@ public class RunTaskService{
 		for (int i = 0; i < len; i ++) {
 			code[3-i] = dst[len-1-i];
 		}
-		cmd.setDstCode(code);
-		return cmd;
+		//cmd.setDstCode(code);
+		return code;
 	}
 
 	/**
@@ -206,7 +288,7 @@ public class RunTaskService{
 			
 			/**设置目的地号为终点站站台ID*/
 			String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-			cmd = setDstCode(task.getDstStationNum(), cmd);
+			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
 			//cmd.setDstCode(endPlatformId.toCharArray());
 			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 			
@@ -394,7 +476,7 @@ public class RunTaskService{
 		cmd.setDstLineNum((short) trainRunInfo.getLineNum()); // ??? need rungraph supply!
 		
 		//cmd.setDstCode(0);	//填啥？
-		cmd = setDstCode(trainRunInfo.getDstStationNum(), cmd);
+		cmd.setDstCode(convertDstCode2Char(trainRunInfo.getDstStationNum()));
 		cmd.setPlanDir((short) ((trainRunInfo.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
@@ -663,6 +745,8 @@ public class RunTaskService{
 	
 	//**初始化值AtoCommand*//*
 	public AppDataAVAtoCommand initAtoCommand(AppDataAVAtoCommand cmd){
+		cmd.setType((short) 0x0203);
+		cmd.setLength((short) 50);
 		cmd.setServiceNum(0xFF);
 		cmd.setLineNum(0);
 		cmd.setNextZcId(0);;

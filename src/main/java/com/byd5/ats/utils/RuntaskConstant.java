@@ -58,9 +58,17 @@ public class RuntaskConstant {
 	 */
 	public final static String RABB_RK_TRACE_LEAVE_RETURN = "ats.traintrace.return.leave";
 	/**
+	 * 到达折返轨消息的路由key
+	 */
+	public final static String RABB_RK_TRACE_ARRIVE_RETURN = "ats.traintrace.return.arrive";
+	/**
 	 * 到达转换轨消息的路由key
 	 */
 	public final static String RABB_RK_TRACE_ARRIVE_TRANSFORM = "ats.traintrace.transform.arrive";
+	/**
+	 * 更正列车运行信息消息的路由key
+	 */
+	public final static String RABB_RK_TRACE_JUDGEATO = "ats.traintrace.judgehasATOcommad";
 	/**
 	 * 告警消息的路由key
 	 */
@@ -95,7 +103,7 @@ public class RuntaskConstant {
 	/**
 	 * 获取运行图模块的运行任务
 	 */
-	public final static String HX_RUNGRAPH_TASK = "http://serv31-trainrungraph/server/getRuntask?groupnum={groupnum}&tablenum={tablenum}&trainnum={trainnum}";
+	public final static String HX_RUNGRAPH_TASK = "http://serv31-trainrungraph/server/getRuntask?groupnum={groupnum}&tablenum={tablenum}&trainnum={trainnum}&platformId={platformId}";
 
 	/**
 	 * 线路编号ID

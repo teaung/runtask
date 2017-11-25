@@ -69,9 +69,10 @@ public class TrainrungraphHystrixService {
 			})
 	public String getRuntask(TrainEventPosition event){
 		String resultMsg = restTemplate.getForObject(RuntaskConstant.HX_RUNGRAPH_TASK
-				, String.class, event.getCargroupNum(), event.getServiceNum(), event.getTrainNum());
+				, String.class, event.getCargroupNum(), event.getServiceNum(), event.getTrainNum(), event.getNextStationId());
 		if(resultMsg == null || resultMsg.equals("null")){
-			sender.senderAlarmEvent("没有找到车组号为:"+event.getCargroupNum()+"表号为:"+event.getServiceNum()+"车次号为:"+event.getTrainNum()+"的运行任务");
+			sender.senderAlarmEvent("没有找到车组号为:"+event.getCargroupNum()+" 表号为:"+event.getServiceNum()+" 车次号为:"+event.getTrainNum()
+			+" 在站台ID为:"+event.getNextStationId()+"的运行任务");
 			return null;
 		}
 		return resultMsg;	
