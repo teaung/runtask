@@ -54,6 +54,10 @@ public class RuntaskConstant {
 	 */
 	public final static String RABB_RK_TRACE_ENTER_STATION = "ats.traintrace.station.enter";
 	/**
+	 * 离站消息的路由key
+	 */
+	public final static String RABB_RK_TRACE_LEAVE_STATION = "ats.traintrace.station.departure";
+	/**
 	 * 离开折返轨消息的路由key
 	 */
 	public final static String RABB_RK_TRACE_LEAVE_RETURN = "ats.traintrace.return.leave";

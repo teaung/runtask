@@ -33,8 +33,9 @@ public class ReceiverTrace {
 	@Autowired
 	private SenderDepart sender;
 	
+	
 	/**
-	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
+	 * 列车进站消息处理：根据车次时刻表向VOBC发送命令指定当前区间运行等级/区间运行时间、当前车站的站停时间。
 	 * @param in
 	 */
 	@RabbitListener(queues = "#{queueTraceStationEnter.name}")
@@ -62,11 +63,48 @@ public class ReceiverTrace {
 		// 向该车发送站间运行等级
 		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event.getServiceNum() != 0 && task != null){//计划车
-			appDataATOCommand = runTaskService.aodCmdEnter(task, event);
+			appDataATOCommand = runTaskService.aodCmdStationEnter(task, event);
 		}
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
+	
+	/**
+	 * 到站(不管是否停稳)消息处理：根据车次时刻表向VOBC发送命令指定下一个区间运行等级/区间运行时间、当前车站的站停时间。
+	 * @param in
+	 */
+	@RabbitListener(queues = "#{queueTraceStationLeave.name}")
+	public void receiveTraceStationLeave(String in) throws JsonParseException, JsonMappingException, IOException {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[trace.station.leave] '" + in + "'");
+		//doWork(in);
+		ObjectMapper objMapper = new ObjectMapper();
+		
+		//反序列化
+		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
+		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+		event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+		
+		//添加列车到站信息
+		//runTaskService.updateMapTrace(event);
+		runTaskService.removeMapTrace(event);
+		
+		//获取或 更新运行图任务信息
+		TrainRunTask task = runTaskService.getMapRuntask(event);
+		
+		// 向该车发送站间运行等级
+		AppDataAVAtoCommand appDataATOCommand = null;
+		if(event.getServiceNum() != 0 && task != null){//计划车
+			appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
+		}
+		sender.sendATOCommand(appDataATOCommand);
+		watch.stop();
+		LOG.info("[trace.station.leave] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 
 	/**
@@ -83,6 +121,9 @@ public class ReceiverTrace {
 		
 		TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
 		event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+		
+		//添加列车到站信息
+		runTaskService.updateMapTrace(event);
 		
 		//获取或 更新运行图任务信息
 		TrainRunTask task = runTaskService.getMapRuntask(event);
@@ -124,6 +165,8 @@ public class ReceiverTrace {
 		try{
 			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
 			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+			//-----------------2017-11-29---
+			runTaskService.removeMapTrace(event);
 			
 			//获取或 更新运行图任务信息
 			TrainRunTask task = runTaskService.getMapRuntask(event);
@@ -204,10 +247,10 @@ public class ReceiverTrace {
 			//--------------2017-11-24-----
 			//获取或 更新运行图任务信息
 			TrainRunTask task = runTaskService.getMapRuntask(event);
-			TrainRunInfo trainRunInfo = new TrainRunInfo();
-			BeanUtils.copyProperties(task, trainRunInfo);
 			
 			if(event.getServiceNum() != 0 && task != null){//计划车
+				TrainRunInfo trainRunInfo = new TrainRunInfo();
+				BeanUtils.copyProperties(task, trainRunInfo);
 				AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdTransform(event, trainRunInfo);
 				sender.sendATOCommand(appDataATOCommand);
 			}
@@ -234,7 +277,6 @@ public class ReceiverTrace {
 		StopWatch watch = new StopWatch();
 		watch.start();
 //		LOG.info("[trace.judgehasATOcommad] '" + in + "'");
-		
 		if(lastTime < 12){
 			lastTime ++;
 			return;
@@ -244,7 +286,6 @@ public class ReceiverTrace {
 			LOG.info("[trace.judgehasATOcommad] '" + in + "'");
 		}
 		
-		String resultMsg = null;
 		ObjectMapper objMapper = new ObjectMapper();
 		
 		//反序列化
@@ -264,26 +305,23 @@ public class ReceiverTrace {
 			if(event.getServiceNum() != 0 && task != null){//计划车
 				//在站台上升级为通信车
 				if(event.getStation() != null){
-					appDataATOCommand = runTaskService.aodCmdEnter(task, event);
+					appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
 					appDataATOCommand.setPlatformStopTime(0xFFFF);//停站时间默认值
 				}
 				else{//在区间上升级为通信车
 					appDataATOCommand = runTaskService.aodCmdSection(event, task);
 					appDataATOCommand.setSectionRunAdjustCmd(0);//区间运行时间默认值
 				}
-				
 			}
 			sender.sendATOCommand(appDataATOCommand);
+			/*sender.sendATOCommand(appDataATOCommand);
 			sender.sendATOCommand(appDataATOCommand);
-			sender.sendATOCommand(appDataATOCommand);
-			sender.sendATOCommand(appDataATOCommand);
-			
+			sender.sendATOCommand(appDataATOCommand);*/
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[trace.judgehasATOcommad] traceData parse error!");
 			e.printStackTrace();
 		}
-		
 		watch.stop();
 		LOG.info("[trace.judgehasATOcommad] Done in " + watch.getTotalTimeSeconds() + "s");
 	}

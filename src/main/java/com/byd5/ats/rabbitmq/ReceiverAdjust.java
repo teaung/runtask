@@ -64,7 +64,7 @@ public class ReceiverAdjust {
 		
 		// 更新运行任务列表
 		Integer carNum = adjustTask.getTraingroupnum();
-		runTaskHandler.updateMapRuntask(carNum, adjustTask);
+		//runTaskHandler.updateMapRuntask(carNum, adjustTask);
 		
 		// 检查该车是否有记录
 		TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
@@ -72,29 +72,39 @@ public class ReceiverAdjust {
 		// 重新向该车发送下一站区间运行时间
 		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event != null){
-			appDataATOCommand = runTaskHandler.aodCmdEnter(adjustTask, event);
+			//获取或 更新运行图任务信息
+			TrainRunTask task = runTaskHandler.getMapRuntask(event);
 			
-			//----------------------计划离站时间有改动----------------
-			int platformId = event.getStation();
-			TrainRunTimetable currStation = null;
-			List<TrainRunTimetable> timetableList = adjustTask.getTrainRunTimetable();
-			for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-				TrainRunTimetable t = timetableList.get(i);
-				if (t.getPlatformId() == platformId) {
-					currStation = t;
+			if(task != null){
+				appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
+				
+				if(appDataATOCommand != null){
+					//----------------------计划离站时间有改动----------------
+					int platformId = event.getStation();
+					TrainRunTimetable currStation = null;
+					List<TrainRunTimetable> timetableList = adjustTask.getTrainRunTimetable();
+					for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+						TrainRunTimetable t = timetableList.get(i);
+						if (t.getPlatformId() == platformId) {
+							currStation = t;
+							break;
+						}
+					}
+					int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
+					appDataATOCommand.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
+					//------------------------------------------------------
+					
+					sender.sendATOCommand(appDataATOCommand);
 				}
+				
+				
+				/*LOG.info("[adjust] ATOCommand: next station ["
+						+ appDataATOCommand.getNextStopPlatformId() + "] next section run time ["
+						+ appDataATOCommand.getSectionRunAdjustCmd()+ "s]"
+						+ "This station stop time ["+ appDataATOCommand.getPlatformStopTime()
+						+ "s]");*/
 			}
-			int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
-			appDataATOCommand.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
-			//------------------------------------------------------
 			
-			sender.sendATOCommand(appDataATOCommand);
-			
-			LOG.info("[adjust] ATOCommand: next station ["
-					+ appDataATOCommand.getNextStopPlatformId() + "] next section run time ["
-					+ appDataATOCommand.getSectionRunAdjustCmd()+ "s]"
-					+ "This station stop time ["+ appDataATOCommand.getPlatformStopTime()
-					+ "s]");
 		}
 		else {
 			//报警？？？

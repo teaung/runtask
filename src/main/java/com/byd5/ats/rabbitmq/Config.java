@@ -152,6 +152,10 @@ public class Config{
 		public Queue queueTraceJudgeATO() {
 			return new AnonymousQueue();
 		}
+		@Bean
+		public Queue queueTraceStationLeave() {
+			return new AnonymousQueue();
+		}
 		//车辆到站停稳消息
 		@Bean
 		public Binding bindingTraceStationArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationArrive) {
@@ -162,17 +166,22 @@ public class Config{
 		public Binding bindingTraceStationEnter(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationEnter) {
 			return BindingBuilder.bind(queueTraceStationEnter).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ENTER_STATION);
 		}
+		//离站
+		@Bean
+		public Binding bindingTraceStationLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceStationLeave) {
+			return BindingBuilder.bind(queueTraceStationLeave).to(ex).with(RuntaskConstant.RABB_RK_TRACE_LEAVE_STATION);
+		}		
 		//离开折返轨
 		@Bean
 		public Binding bindingTraceReturnLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceReturnLeave) {
 			return BindingBuilder.bind(queueTraceReturnLeave).to(ex).with(RuntaskConstant.RABB_RK_TRACE_LEAVE_RETURN);
 		}
-		//离开折返轨
+		//到达折返轨
 		@Bean
 		public Binding bindingTraceReturnArrive(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceReturnArrive) {
 			return BindingBuilder.bind(queueTraceReturnArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_RETURN);
 		}		
-		// 离开折返轨
+		// 到达转换轨
 		@Bean
 		public Binding bindingTraceTransformArrive(@Qualifier("exchangeTrace") TopicExchange ex,Queue queueTraceTransformArrive) {
 			return BindingBuilder.bind(queueTraceTransformArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_TRANSFORM);
