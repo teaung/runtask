@@ -91,7 +91,9 @@ public class ReceiverAdjust {
 						}
 					}
 					int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
-					appDataATOCommand.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
+					if(timeStationStop < 0){
+						appDataATOCommand.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
+					}
 					//------------------------------------------------------
 					
 					sender.sendATOCommand(appDataATOCommand);
@@ -114,4 +116,52 @@ public class ReceiverAdjust {
 		watch.stop();
 		System.out.println("[adjust] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
+	
+	/*@RabbitListener(queues = "#{queueAdjust.name}")
+	public void receiveAdjust(String in) throws JsonParseException, JsonMappingException, IOException {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[adjust] '" + in + "'");
+		
+		TrainRunTask adjustTask = null;
+		
+		ObjectMapper objMapper = new ObjectMapper();
+		
+		//反序列化
+		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
+		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		adjustTask = objMapper.readValue(in, TrainRunTask.class);
+		
+		// 更新运行任务列表
+		Integer carNum = adjustTask.getTraingroupnum();
+		runTaskHandler.updateMapRuntask(carNum, adjustTask);
+		
+		// 检查该车是否有记录
+		TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
+		
+		// 重新向该车发送下一站区间运行时间
+		AppDataAVAtoCommand appDataATOCommand = null;
+		if(event != null){
+			//获取或 更新运行图任务信息
+			//TrainRunTask task = runTaskHandler.getMapRuntask(event);
+			
+			if(adjustTask != null){
+				appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(adjustTask, event);
+				
+				if(appDataATOCommand != null && appDataATOCommand.getPlatformStopTime()>=0 && appDataATOCommand.getSectionRunAdjustCmd()>0){
+					sender.sendATOCommand(appDataATOCommand);
+				}
+			}
+			
+		}
+		else {
+			//报警？？？
+			LOG.info("[adjust] not find the car (" + carNum + ") in trace list, so do nothing.");
+		}
+		
+		watch.stop();
+		System.out.println("[adjust] Done in " + watch.getTotalTimeSeconds() + "s");
+	}*/
 }

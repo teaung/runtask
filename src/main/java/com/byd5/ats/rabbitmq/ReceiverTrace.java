@@ -65,6 +65,9 @@ public class ReceiverTrace {
 		if(event.getServiceNum() != 0 && task != null){//计划车
 			appDataATOCommand = runTaskService.aodCmdStationEnter(task, event);
 		}
+		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+			appDataATOCommand = runTaskService.aodCmdStationEnterUnplan(event);
+		}
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -101,6 +104,9 @@ public class ReceiverTrace {
 		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event.getServiceNum() != 0 && task != null){//计划车
 			appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
+		}
+		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+			appDataATOCommand = runTaskService.aodCmdStationLeaveUnplan(event);
 		}
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
@@ -170,12 +176,15 @@ public class ReceiverTrace {
 			
 			//获取或 更新运行图任务信息
 			TrainRunTask task = runTaskService.getMapRuntask(event);
+			AppDataAVAtoCommand appDataATOCommand = null;
 			
 			if(event.getServiceNum() != 0 && task != null){//计划车
-				AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdReturn(event, task);
-				sender.sendATOCommand(appDataATOCommand);
+				appDataATOCommand = runTaskService.aodCmdReturn(event, task);
 			}
-			
+			if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+				appDataATOCommand = runTaskService.aodCmdStationLeaveUnplan(event);
+			}
+			sender.sendATOCommand(appDataATOCommand);
 		}catch (Exception e) {
 			// TODO: handle exception
 			e.printStackTrace();
@@ -217,6 +226,9 @@ public class ReceiverTrace {
 		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event.getServiceNum() != 0 && task != null){//计划车
 			appDataATOCommand = runTaskService.aodCmdReturn(event, task);
+		}
+		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+			appDataATOCommand = runTaskService.aodCmdStationLeaveUnplan(event);
 		}
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();

@@ -9,7 +9,7 @@ spring:
     active: topics,sender,remote
 
   rabbitmq:
-    host: 10.5.133.219
+    host: 10.5.133.213
     port: 5672
     username: atsusr
     password: atspwd

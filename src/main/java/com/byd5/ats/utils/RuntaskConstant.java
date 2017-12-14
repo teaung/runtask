@@ -108,7 +108,20 @@ public class RuntaskConstant {
 	 * 获取运行图模块的运行任务
 	 */
 	public final static String HX_RUNGRAPH_TASK = "http://serv31-trainrungraph/server/getRuntask?groupnum={groupnum}&tablenum={tablenum}&trainnum={trainnum}&platformId={platformId}";
-
+	/**
+	 * 获取参数管理的参数信息
+	 */
+	public final static String HX_PARA_TIME = "http://serv50-maintenance/send?json={json}";
+	/**
+	 * 获取识别跟踪的正线上所有列车位置信息
+	 */
+	public final static String HX_TRACE_CARS = "http://serv32-traintrace/allTrainStatus";
+	/**
+	 * 获取识别跟踪的列车所在当前车站的下一站台ID
+	 */
+	public final static String HX_TRACE_NEXTPLATFORM = "http://serv32-traintrace/getNextStationId?trainDir={trainDir}&station={station}";
+	
+	
 	/**
 	 * 线路编号ID
 	 */

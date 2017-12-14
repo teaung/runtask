@@ -57,4 +57,134 @@ public class TraincontrolHystrixService {
 		logger.error("[getDwellTime] serv35-traincontrol connetc error!");
 		return "error";
 	}
+	
+	
+	/**
+	 * 获取当前站台默认停站时间
+	 */
+	@HystrixCommand(fallbackMethod = "getAllTrainStatusFallback",
+			commandProperties = {
+					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
+			})
+	public String getAllTrainStatus() {
+		// TODO Auto-generated method stub
+		String allTrainStatus = restTemplate.getForObject(RuntaskConstant.HX_TRACE_CARS, String.class);
+		logger.info("[getAllTrainStatus] allTrainStatus: " + allTrainStatus);
+		/*if(defDwellTimeStr == null){
+			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
+		}*/
+		return allTrainStatus;	
+	}
+	public String getAllTrainStatusFallback(){
+		sender.senderAlarmEvent("获取正线所有列车位置信息，识别跟踪服务故障!");
+		logger.error("[getAllTrainStatus] serv32-traintrace connetc error!");
+		return "error";
+	}
+	
+	/**
+	 * 获取当前站台的下一站站台ID
+	 */
+	@HystrixCommand(fallbackMethod = "getNextPlatformIdFallback",
+			commandProperties = {
+					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
+			})
+	public String getNextPlatformId(short trainDir, Integer platform) {
+		// TODO Auto-generated method stub
+		String nextPlatformId = restTemplate.getForObject(RuntaskConstant.HX_TRACE_NEXTPLATFORM, String.class, trainDir, platform);
+		logger.info("[getNextPlatformId] nextPlatformId: " + nextPlatformId);
+		/*if(defDwellTimeStr == null){
+			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
+		}*/
+		return nextPlatformId;	
+	}
+	public String getNextPlatformIdFallback(short trainDir, Integer platform){
+		sender.senderAlarmEvent("获取当前站台的下一站站台ID，识别跟踪服务故障!");
+		logger.error("[getNextPlatformId] serv32-traintrace connetc error!");
+		return "error";
+	}
+	
+	/**
+	 * 获取当前站台默认停站时间
+	 */
+	@HystrixCommand(fallbackMethod = "getDefDwellTimeFallback",
+			commandProperties = {
+					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
+			})
+	public String getDefDwellTime(Integer platformId){
+		String defDwellTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, "116");
+		//logger.info("[getDefDwellTime] defDwellTimeStr: " + defDwellTimeStr);
+		if(defDwellTimeStr == null){
+			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
+		}
+		return defDwellTimeStr;	
+	}
+	public String getDefDwellTimeFallback(Integer platformId){
+		sender.senderAlarmEvent("获取站台"+platformId+"默认停站时间失败，参数管理服务故障!");
+		logger.error("[getDefDwellTime] serv50-maintenance connetc error!");
+		//return "error";
+		return RuntaskConstant.DEF_DWELL_TIME.toString();
+	}
+
+	/**
+	 * 获取当前站台默认停站时间
+	 */
+	@HystrixCommand(fallbackMethod = "getDefRunTimeFallback",
+			commandProperties = {
+					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
+			})
+	public String getDefRunTime(Integer platformId) {
+		// TODO Auto-generated method stub
+		String defDwellTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, getRunTimeStr(platformId));
+		//logger.info("[getDefRunTime] defDwellTimeStr: " + defDwellTimeStr);
+		/*if(defDwellTimeStr == null){
+			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
+		}*/
+		return defDwellTimeStr;	
+	}
+	public String getDefRunTimeFallback(Integer platformId){
+		sender.senderAlarmEvent("获取站台"+platformId+"默认区间时间失败，参数管理服务故障!");
+		logger.error("[getDefRunTime] serv50-maintenance connetc error!");
+		return "error";
+	}
+	
+	public String getRunTimeStr(Integer platformId) {
+		String runTimeStr = null;
+		switch (platformId) {
+		default:
+			System.out.println("打印默认值");
+			break;
+		case 1:
+			runTimeStr = "eight2one";
+			break;
+		case 2:
+			runTimeStr =  "one2two";
+			break;
+		case 3:
+			runTimeStr =  "two2three";
+			break;
+		case 4:
+			runTimeStr =  "three2four";
+			break;
+		case 5:
+			runTimeStr =  "four2five";
+			break;
+		case 6:
+			runTimeStr =  "five2six";
+			break;
+		case 7:
+			runTimeStr =  "returnTrack2seven";
+			break;
+		case 8:
+			runTimeStr =  "seven2eight";
+			break;
+		case 9:
+			runTimeStr =  "six2returnTrack";
+			break;
+		case 0:
+			runTimeStr =  "returnTrack2transform";
+			break;
+		}
+		logger.info("[getRunTimeStr] runTimeStr: " + runTimeStr);
+		return runTimeStr;
+	}
 }
