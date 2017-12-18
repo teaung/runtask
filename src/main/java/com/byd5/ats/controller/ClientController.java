@@ -182,7 +182,7 @@ public class ClientController{
 					if (task != null && event != null && event.getStation() == platformId
 							&& event.getServiceNum() != 0) {
 						//-------------------给车发AOD命令(停站时间0)----2017-11-28------------
-						appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
+						appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 				
 						//-------------------给客户端发停站时间0----------------
 						appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
@@ -308,31 +308,6 @@ public class ClientController{
 				if(dtStatus.get(i) != listDtStatus.get(i)){//扣车状态有改变
 					listDtStatus.set(i, dtStatus.get(i));//更新该车站扣车状态
 					Integer platformId = i + 1;
-					/*for(TrainEventPosition event:mapTrace.values()){
-						LOG.info("[dtStatus] TrainEventPosition: " + event.getStation());
-//						if(event != null && platformId == event.getStation() && listDtStatus.get(i) == 3){
-						if(event != null && platformId == event.getStation()){
-							//获取或 更新运行图任务信息
-							TrainRunTask task = runTaskHandler.getMapRuntask(event);
-							
-							// 向该车发送站间运行等级
-							AppDataAVAtoCommand appDataATOCommand = null;
-							if(event.getServiceNum() != 0 && task != null){//计划车
-//								appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
-								appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
-							}
-							else{//非计划车
-								//-------------------给车发扣车AOD命令----------------
-								appDataATOCommand = runTaskHandler.aodCmdArriveAdjustUnplan(event);//非计划车
-							}
-							if(appDataATOCommand != null){
-								appDataATOCommand.setPlatformStopTime(0xFFFF);	//是否设置为默认值？
-								//appDataATOCommand.setDetainCmd((short) 0xAA);//0x55有扣车，0xAA无扣车\取消扣车
-								sender.sendATOCommand(appDataATOCommand);
-								LOG.info("[dtStatus] 设置取消扣车，发送ATO命令 ");
-							}
-						}
-					}*/
 					List<TrainEventPosition> carList = getAllTrainStatus(platformId);
 					for(TrainEventPosition event:carList){
 						//获取或 更新运行图任务信息
@@ -343,7 +318,7 @@ public class ClientController{
 						if(event.getServiceNum() != 0 && task != null && event.getServiceNum() != 0){
 //							appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 							if(event.getStation() != null){//计划车(在站台上时才下发ATO)
-								appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
+								appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 							}
 							
 						}
@@ -352,16 +327,7 @@ public class ClientController{
 							if(event.getStation() != null){
 								appDataATOCommand = runTaskHandler.aodCmdStationEnterUnplan(event);
 							}
-							else{
-								appDataATOCommand = runTaskHandler.aodCmdStationLeaveUnplan(event);
-							}
 						}
-						/*if(appDataATOCommand != null){
-							appDataATOCommand.setPlatformStopTime(0xFFFF);	//是否设置为默认值？
-							//appDataATOCommand.setDetainCmd((short) 0xAA);//0x55有扣车，0xAA无扣车\取消扣车
-							sender.sendATOCommand(appDataATOCommand);
-							LOG.info("[dtStatus] 设置取消扣车，发送ATO命令 ");
-						}*/
 						sender.sendATOCommand(appDataATOCommand);
 						LOG.info("[dtStatus] 设置取消扣车，发送ATO命令 ");
 					}
@@ -426,7 +392,12 @@ public class ClientController{
 		AppDataAVAtoCommand appDataATOCommand = null;
 		if(event.getServiceNum() != 0 && task != null && event.getServiceNum() != 0){//计划车
 //			appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
-			appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
+			if(event.getStation() != null){
+				appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+			}
+			else{
+				appDataATOCommand = runTaskHandler.aodCmdStationLeave(task, event);
+			}
 		}
 		else if(event.getServiceNum() == 0){//非计划车
 			if(event.getStation() != null){

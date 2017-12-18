@@ -48,7 +48,7 @@ public class TestController{
 	/*** (计划车)列车到站（未停稳）测试*/
 	@RequestMapping(value = "/stationEnter")
 	public void stationEnter() throws JsonParseException, JsonMappingException, IOException{
-		event.setServiceNum((short) 255);
+		event.setServiceNum((short) 0);
 		event.setTrainNum(102);
 		event.setCargroupNum(102);
 		event.setTimestamp(new Date().getTime());
@@ -64,13 +64,13 @@ public class TestController{
 	/*** (计划车)列车到站（停稳）测试*/
 	@RequestMapping(value = "/stationArrive")
 	public void stationArrive() throws JsonParseException, JsonMappingException, IOException{
-		event.setServiceNum((short) 0);
+		event.setServiceNum((short) 1);
 		event.setTrainNum((short) 102);
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(new Date().getTime());
 		event.setDstCode("ZF");
-		event.setStation(6);
-		event.setNextStationId(7);
+		event.setStation(3);
+		event.setNextStationId(4);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationArrive(json);
@@ -80,13 +80,14 @@ public class TestController{
 	/*** (计划车)列车离站测试*/
 	@RequestMapping(value = "/stationLeave")
 	public void stationLeave() throws JsonParseException, JsonMappingException, IOException{
-		event.setServiceNum((short) 255);
+		event.setServiceNum((short) 0);
 		event.setTrainNum((short) 102);
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(new Date().getTime());
-		event.setDstCode("ZF");
-		event.setStation(6);
-		event.setNextStationId(7);
+		event.setDstCode("ZH");
+		event.setTrainDir((short) 85);
+		event.setStation(3);
+		event.setNextStationId(4);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationLeave(json);
@@ -119,6 +120,7 @@ public class TestController{
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(1505520000000L);
 		event.setDstCode("ZF");
+		event.setTrainDir((short) 85);
 		event.setStation(9);
 		event.setNextStationId(7);
 		
@@ -168,8 +170,8 @@ public class TestController{
 		event.setCargroupNum((short) 103);
 		event.setTimestamp(1505520000000L);
 		event.setDstCode("ZF");
-		event.setStation(1);
-		event.setNextStationId(2);
+		event.setStation(9);
+		event.setNextStationId(7);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceReturnLeave(json);
@@ -238,7 +240,7 @@ public class TestController{
 		event.setStation(null);
 		event.setNextStationId(4);
 		List<Byte> listDtStatus = runTaskHandler.listDtStatus;//[3, 3, 1, 3, 3, 3, 3, 3]
-		listDtStatus.set(2, (byte) 1);
+		listDtStatus.set(2, (byte) 3);
 		AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdStationLeaveUnplan(event);
 		System.out.println(mapper.writeValueAsString(appDataATOCommand));
 	}

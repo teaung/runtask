@@ -76,7 +76,7 @@ public class ReceiverAdjust {
 			TrainRunTask task = runTaskHandler.getMapRuntask(event);
 			
 			if(task != null){
-				appDataATOCommand = runTaskHandler.aodCmdArriveAdjust(task, event);
+				appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 				
 				if(appDataATOCommand != null){
 					//----------------------计划离站时间有改动----------------
