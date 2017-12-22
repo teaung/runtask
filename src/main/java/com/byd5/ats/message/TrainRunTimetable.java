@@ -2,6 +2,8 @@ package com.byd5.ats.message;
 
 import org.springframework.beans.factory.annotation.Value;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /*
 [rungraph] Received 
 '{"traingroupnum":3,"tablenum":1,"trainnum":102,
@@ -26,6 +28,7 @@ public class TrainRunTimetable {
 	private byte returnMode;// 折返模式(0=无折返；1=站前折返；2=站后折返)
 	private int prevPlatformId;// 上一站台ID
 	private int nextPlatformId;// 下一站台ID
+
 
 	public int getPlatformId() {
 		return platformId;
@@ -69,4 +72,24 @@ public class TrainRunTimetable {
 	public void setNextPlatformId(int nextPlatformId) {
 		this.nextPlatformId = nextPlatformId;
 	}
+	
+	//@JsonIgnore
+	private long stopTime;//	当前站台停站时间
+	//@JsonIgnore
+	private long runTime;//		当前站台区间运行时间
+
+
+	public long getStopTime() {
+		return stopTime;
+	}
+	public void setStopTime(long stopTime) {
+		this.stopTime = stopTime;
+	}
+	public long getRunTime() {
+		return runTime;
+	}
+	public void setRunTime(long runTime) {
+		this.runTime = runTime;
+	}
+
 }

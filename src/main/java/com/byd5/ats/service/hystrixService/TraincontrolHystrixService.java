@@ -47,15 +47,28 @@ public class TraincontrolHystrixService {
 			commandProperties = {
 					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
 			})
-	public String getDwellTime(Integer platformId){
+	public Integer getDwellTime(Integer platformId){
 		String dwelltimeStr = restTemplate.getForObject(RuntaskConstant.HX_CONTROL_DWELL_TIME, String.class, platformId);
-		return dwelltimeStr;	
+		logger.info("[getDwellTime] platformId:{} defDwellTime:{}", platformId, dwelltimeStr);
+		if(dwelltimeStr != null){
+			try{
+				return Integer.parseInt(dwelltimeStr);
+			}catch (Exception e) {
+				// TODO: handle exception
+				sender.senderAlarmEvent("ATO命令下发失败,系统停站时间参数含非法字符");
+				return null;
+			}
+		}
+		else{
+			sender.senderAlarmEvent("从serv35-traincontrol未获取到站台"+platformId+"停站时间");
+		}
+		return null;	
 	}
 	
-	public String fallbackGetDwellTime(Integer platformId){
+	public Integer fallbackGetDwellTime(Integer platformId){
 		sender.senderAlarmEvent("获取站台"+platformId+"停站时间失败，运行控制服务故障!");
 		logger.error("[getDwellTime] serv35-traincontrol connetc error!");
-		return "error";
+		return null;
 	}
 	
 	
@@ -110,19 +123,29 @@ public class TraincontrolHystrixService {
 			commandProperties = {
 					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
 			})
-	public String getDefDwellTime(Integer platformId){
+	public Integer getDefDwellTime(Integer platformId){
 		String defDwellTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, "116");
-		//logger.info("[getDefDwellTime] defDwellTimeStr: " + defDwellTimeStr);
-		if(defDwellTimeStr == null){
-			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
+		logger.info("[getDefDwellTime] platformId:{} defDwellTime:{}", platformId, defDwellTimeStr);
+		if(defDwellTimeStr != null){
+			try{
+				return Integer.parseInt(defDwellTimeStr);
+			}catch (Exception e) {
+				// TODO: handle exception
+				sender.senderAlarmEvent("ATO命令下发失败,系统停站时间参数含非法字符");
+				logger.error("[getDefDwellTime] ATO命令下发失败,系统停站时间参数含非法字符!");
+				return null;
+			}
 		}
-		return defDwellTimeStr;	
+		else{
+			sender.senderAlarmEvent("从serv50-maintenance未获取到站台"+platformId+"停站时间");
+		}
+		return null;	
 	}
-	public String getDefDwellTimeFallback(Integer platformId){
+	public Integer getDefDwellTimeFallback(Integer platformId){
 		sender.senderAlarmEvent("获取站台"+platformId+"默认停站时间失败，参数管理服务故障!");
 		logger.error("[getDefDwellTime] serv50-maintenance connetc error!");
 		//return "error";
-		return RuntaskConstant.DEF_DWELL_TIME.toString();
+		return null;
 	}
 
 	/**
@@ -132,19 +155,28 @@ public class TraincontrolHystrixService {
 			commandProperties = {
 					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
 			})
-	public String getDefRunTime(Integer platformId) {
+	public Integer getDefRunTime(Integer platformId) {
 		// TODO Auto-generated method stub
-		String defDwellTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, getRunTimeStr(platformId));
-		//logger.info("[getDefRunTime] defDwellTimeStr: " + defDwellTimeStr);
-		/*if(defDwellTimeStr == null){
-			defDwellTimeStr = RuntaskConstant.DEF_DWELL_TIME.toString();//默认值30
-		}*/
-		return defDwellTimeStr;	
+		String defRunTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, getRunTimeStr(platformId));
+		logger.info("[getDefRunTime] platformId:{} defRunTime:{}", platformId, defRunTimeStr);
+		if(defRunTimeStr != null){
+			try{
+				return Integer.parseInt(defRunTimeStr);
+			}catch (Exception e) {
+				sender.senderAlarmEvent("ATO命令下发失败,系统区间运行时间参数含非法字符");
+				logger.error("[getDefRunTime] ATO命令下发失败,系统区间运行时间参数含非法字符!");
+				return null;
+			}
+		}
+		else{
+			sender.senderAlarmEvent("从serv50-maintenance未获取到站台"+platformId+"区间运行时间");
+		}
+		return null;	
 	}
-	public String getDefRunTimeFallback(Integer platformId){
+	public Integer getDefRunTimeFallback(Integer platformId){
 		sender.senderAlarmEvent("获取站台"+platformId+"默认区间时间失败，参数管理服务故障!");
 		logger.error("[getDefRunTime] serv50-maintenance connetc error!");
-		return "error";
+		return null;
 	}
 	
 	public String getRunTimeStr(Integer platformId) {
@@ -153,31 +185,31 @@ public class TraincontrolHystrixService {
 		default:
 			System.out.println("打印默认值");
 			break;
-		case 1:
+		case 8:
 			runTimeStr = "eight2one";
 			break;
-		case 2:
+		case 1:
 			runTimeStr =  "one2two";
 			break;
-		case 3:
+		case 2:
 			runTimeStr =  "two2three";
 			break;
-		case 4:
+		case 3:
 			runTimeStr =  "three2four";
 			break;
-		case 5:
+		case 4:
 			runTimeStr =  "four2five";
 			break;
-		case 6:
+		case 5:
 			runTimeStr =  "five2six";
 			break;
-		case 7:
+		case 9:
 			runTimeStr =  "returnTrack2seven";
 			break;
-		case 8:
+		case 7:
 			runTimeStr =  "seven2eight";
 			break;
-		case 9:
+		case 6:
 			runTimeStr =  "six2returnTrack";
 			break;
 		case 0:

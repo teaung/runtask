@@ -82,17 +82,19 @@ public class ReceiverAdjust {
 					//----------------------计划离站时间有改动----------------
 					int platformId = event.getStation();
 					TrainRunTimetable currStation = null;
+					TrainRunTimetable nextStation = null;
 					List<TrainRunTimetable> timetableList = adjustTask.getTrainRunTimetable();
 					for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 						TrainRunTimetable t = timetableList.get(i);
 						if (t.getPlatformId() == platformId) {
 							currStation = t;
+							nextStation = timetableList.get(i+1);
 							break;
 						}
 					}
-					int timeStationStop = (int) ((currStation.getPlanLeaveTime() - event.getTimestamp())/1000); // 当前车站站停时间（单位：秒）
-					if(timeStationStop < 0){
-						appDataATOCommand.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）0xFFFF
+					int runtime = (int) (nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime());
+					if(runtime < 0){
+						appDataATOCommand.setSectionRunAdjustCmd(runtime); //计划站停时间（单位：秒）0xFFFF
 					}
 					//------------------------------------------------------
 					

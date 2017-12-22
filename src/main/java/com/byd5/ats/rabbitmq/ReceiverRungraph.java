@@ -101,7 +101,7 @@ public class ReceiverRungraph {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		try{
+		/*try{
 			TrainRunInfo trainRunInfo = objMapper.readValue(in, TrainRunInfo.class);
 			Integer carNum = trainRunInfo.getTraingroupnum();
 			// 检查该车是否有记录----2017-11-08
@@ -116,7 +116,7 @@ public class ReceiverRungraph {
 			// TODO: handle exception
 			e.printStackTrace();
 			LOG.error("[rungraph RunInfo] parse data error!");
-		}
+		}*/
 		
 		
 		watch.stop();

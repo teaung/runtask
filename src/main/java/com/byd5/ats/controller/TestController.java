@@ -3,6 +3,7 @@ package com.byd5.ats.controller;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +21,12 @@ import com.byd5.ats.rabbitmq.ReceiverAdjust;
 import com.byd5.ats.rabbitmq.ReceiverTrace;
 import com.byd5.ats.service.RunTaskService;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
+import com.byd5.ats.utils.RuntaskUtils;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 @RestController
 @Component
@@ -37,6 +40,7 @@ public class TestController{
 	private TraincontrolHystrixService traincontrolHystrixService;
 	
 	private ObjectMapper mapper = new ObjectMapper(); // 转换器
+	
 
 	@Autowired
 	ReceiverTrace ReceiverTrace;
@@ -44,21 +48,28 @@ public class TestController{
 	ReceiverAdjust receiverAdjust;
 	@Autowired
 	private RunTaskService runTaskHandler;
+	@Autowired
+	RuntaskUtils runtaskUtils;
 	
 	/*** (计划车)列车到站（未停稳）测试*/
 	@RequestMapping(value = "/stationEnter")
 	public void stationEnter() throws JsonParseException, JsonMappingException, IOException{
-		event.setServiceNum((short) 0);
+		event.setServiceNum((short)1);
 		event.setTrainNum(102);
 		event.setCargroupNum(102);
 		event.setTimestamp(new Date().getTime());
-		event.setDstCode("ZF");
+		event.setDstCode("AI");
 		event.setStation(3);
 		event.setNextStationId(4);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationEnter(json);
 		log.info("处理完成：");
+		
+		Map<Integer, TrainRunTask> runtaskMap = runTaskHandler.mapRunTask;
+		TrainRunTask runtask = runtaskMap.get(102);
+		runtask = runtaskUtils.calculateTime(runtask);
+		log.info(mapper.writeValueAsString(runtask));
 	}
 
 	/*** (计划车)列车到站（停稳）测试*/
@@ -84,7 +95,7 @@ public class TestController{
 		event.setTrainNum((short) 102);
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(new Date().getTime());
-		event.setDstCode("ZH");
+		event.setDstCode("");
 		event.setTrainDir((short) 85);
 		event.setStation(3);
 		event.setNextStationId(4);
@@ -178,6 +189,24 @@ public class TestController{
 		log.info("处理完成：");
 	}
 	
+	/*** (非计划车)列车离开折返轨测试
+	 * @throws Exception */
+	@RequestMapping(value = "/transformArriveUnplan")
+	public void transformArriveUnplan() throws Exception{
+		event.setServiceNum((short) 0);
+		event.setTrainNum((short) 102);
+		event.setCargroupNum((short) 103);
+		event.setTimestamp(1505520000000L);
+		event.setDstCode("ZF");
+		event.setStation(10);
+		event.setNextStationId(9);
+		event.setTrainDir((short) 0x55);
+		
+		String json = mapper.writeValueAsString(event);
+		ReceiverTrace.receiveTraceTransformArrive(json);
+		log.info("处理完成：");
+	}
+	
 	
 	/*** 早晚点测试
 	 * @throws Exception */
@@ -231,17 +260,18 @@ public class TestController{
 	
 	@RequestMapping(value = "/setDetain")
 	public void setDetain() throws JsonProcessingException{
+		mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
 		event.setServiceNum((short) 0);
 		event.setTrainNum((short) 102);
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(1511824717000L);
 		event.setTrainDir((short) 85);
-		event.setDstCode("ZF"); 
-		event.setStation(null);
+		event.setDstCode(null); 
+		event.setStation(3);
 		event.setNextStationId(4);
 		List<Byte> listDtStatus = runTaskHandler.listDtStatus;//[3, 3, 1, 3, 3, 3, 3, 3]
-		listDtStatus.set(2, (byte) 3);
-		AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdStationLeaveUnplan(event);
+		listDtStatus.set(2, (byte) 1);
+		AppDataAVAtoCommand appDataATOCommand = runTaskHandler.getStationEnterUnplan(event);
 		System.out.println(mapper.writeValueAsString(appDataATOCommand));
 	}
 }

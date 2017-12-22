@@ -14,6 +14,7 @@ import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.utils.RuntaskUtils;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -32,6 +33,8 @@ public class ReceiverTrace {
 	
 	@Autowired
 	private SenderDepart sender;
+	@Autowired
+	private RuntaskUtils runtaskUtils;
 	
 	
 	/**
@@ -66,8 +69,17 @@ public class ReceiverTrace {
 			appDataATOCommand = runTaskService.aodCmdStationEnter(task, event);
 		}
 		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-			appDataATOCommand = runTaskService.aodCmdStationEnterUnplan(event);
+			appDataATOCommand = runTaskService.getStationEnterUnplan(event);
 		}
+		if(event.getServiceNum() == 0 && 
+				(event.getDstCode() == null || event.getDstCode() != null && "".equals(event.getDstCode()))){//人工车
+			short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
+			if(event.getServiceNum() == 0 && detainCmd == 0x55){
+				//appDataATOCommand = runTaskService.getStationEnterUnplan(event);
+				appDataATOCommand = runTaskService.getStationDetainUnplan(event, event.getStation());
+			}
+		}
+		
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -106,7 +118,7 @@ public class ReceiverTrace {
 			appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
 		}
 		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-			appDataATOCommand = runTaskService.aodCmdStationLeaveUnplan(event);
+			appDataATOCommand = runTaskService.getStationLeaveUnplan(event);
 		}
 		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
@@ -142,6 +154,11 @@ public class ReceiverTrace {
 		}		
 		
 		if(event.getServiceNum() == 0){//非计划车
+			/**当前站台有扣车，不发发车倒计时*/
+			/*short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
+			if(detainCmd != 0x55){//有扣车
+				appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+			}*/
 			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
 		}
 		
@@ -182,7 +199,7 @@ public class ReceiverTrace {
 				appDataATOCommand = runTaskService.aodCmdReturn(event, task);
 			}
 			if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-				appDataATOCommand = runTaskService.aodCmdStationLeaveUnplan(event);
+				appDataATOCommand = runTaskService.getStationLeaveUnplan(event);
 			}
 			sender.sendATOCommand(appDataATOCommand);
 		}catch (Exception e) {
@@ -278,40 +295,46 @@ public class ReceiverTrace {
 			TrainRunTask task = runTaskService.getMapRuntask(event);
 			
 			if(event.getServiceNum() != 0 && task != null){//计划车
-				if("ZH".equals(event.getDstCode()) && event.getTrainDir() == 0x55){
+				if(event.getTrainDir() == 0x55){//回段
 					/**ATO命令信息*/
 					AppDataAVAtoCommand appDataATOCommand = new AppDataAVAtoCommand();
 					/**初始化ATO命令数据为默认值*/
 					appDataATOCommand = runTaskService.initAtoCommand(appDataATOCommand);
+					appDataATOCommand.setNextSkipCmd((short) 0xFF);
+					appDataATOCommand.setDetainCmd((short) 0xFF);
 					appDataATOCommand.setReserved((int) event.getSrc());	//预留字段填车辆VID
-					appDataATOCommand.setCargroupLineNum(event.getCargroupLineNum());
+					//appDataATOCommand.setCargroupLineNum(event.getCargroupLineNum());
 					appDataATOCommand.setCargroupNum(event.getCargroupNum());
 					appDataATOCommand.setTrainNum(event.getTrainNum());
 					/**设置目的地号为终点站站台ID*/
-					//appDataATOCommand.setDstCode(runTaskService.convertDstCode2Char(event.getDstCode()));
+					appDataATOCommand.setDstCode(runtaskUtils.convertDstCode2Char(event.getDstCode()));
 					appDataATOCommand.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
 					appDataATOCommand.setBackDepotCmd((short) 0x55);
 					sender.sendATOCommand(appDataATOCommand);
 				}
+				else{
+					TrainRunInfo trainRunInfo = new TrainRunInfo();
+					BeanUtils.copyProperties(task, trainRunInfo);
+					AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdTransform(event, trainRunInfo);
+					sender.sendATOCommand(appDataATOCommand);
+				}
 				
-				/*TrainRunInfo trainRunInfo = new TrainRunInfo();
-				BeanUtils.copyProperties(task, trainRunInfo);
-				AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdTransform(event, trainRunInfo);
-				sender.sendATOCommand(appDataATOCommand);*/
 			}
-			else if("ZH".equals(event.getDstCode()) && event.getTrainDir() == 0x55){
+			else if(event.getTrainDir() == 0x55){
 				/**ATO命令信息*/
 				AppDataAVAtoCommand appDataATOCommand = new AppDataAVAtoCommand();
 				/**初始化ATO命令数据为默认值*/
 				appDataATOCommand = runTaskService.initAtoCommand(appDataATOCommand);
+				appDataATOCommand.setNextSkipCmd((short) 0xFF);
+				appDataATOCommand.setDetainCmd((short) 0xFF);
 				appDataATOCommand.setReserved((int) event.getSrc());	//预留字段填车辆VID
-				appDataATOCommand.setCargroupLineNum(event.getCargroupLineNum());
+				//appDataATOCommand.setCargroupLineNum(event.getCargroupLineNum());
 				appDataATOCommand.setCargroupNum(event.getCargroupNum());
 				appDataATOCommand.setTrainNum(event.getTrainNum());
 				/**设置目的地号为终点站站台ID*/
-				//appDataATOCommand.setDstCode(runTaskService.convertDstCode2Char(event.getDstCode()));
+				appDataATOCommand.setDstCode(runtaskUtils.convertDstCode2Char(event.getDstCode()));
 				appDataATOCommand.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
-				appDataATOCommand.setBackDepotCmd((short) 0x55);
+				appDataATOCommand.setBackDepotCmd((short) 0xFF);
 				sender.sendATOCommand(appDataATOCommand);
 			}
 			//--------------------
@@ -324,66 +347,6 @@ public class ReceiverTrace {
 		
 		watch.stop();
 		LOG.info("[trace.transform.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
-	}
-	
-	private int lastTime = 0;
-	/**
-	 * 到达转换轨时，保存列车位置信息
-	 * @param in
-	 * @throws Exception 
-	 */
-	@RabbitListener(queues = "#{queueTraceJudgeATO.name}")
-	public void receiveTraceJudgeATO(String in) throws Exception {
-		StopWatch watch = new StopWatch();
-		watch.start();
-//		LOG.info("[trace.judgehasATOcommad] '" + in + "'");
-		if(lastTime < 12){
-			lastTime ++;
-			return;
-		}
-		else{
-			lastTime = 0;
-			LOG.info("[trace.judgehasATOcommad] '" + in + "'");
-		}
-		
-		ObjectMapper objMapper = new ObjectMapper();
-		
-		//反序列化
-		//当反序列化json时，未知属性会引起发序列化被打断，这里禁用未知属性打断反序列化功能，
-		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
-		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-		
-		try{
-			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
-			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
-			
-			//获取或 更新运行图任务信息
-			TrainRunTask task = runTaskService.getMapRuntask(event);
-			
-			// 向该车发送站间运行等级
-			AppDataAVAtoCommand appDataATOCommand = null;
-			if(event.getServiceNum() != 0 && task != null){//计划车
-				//在站台上升级为通信车
-				if(event.getStation() != null){
-					appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
-					appDataATOCommand.setPlatformStopTime(0xFFFF);//停站时间默认值
-				}
-				else{//在区间上升级为通信车
-					appDataATOCommand = runTaskService.aodCmdSection(event, task);
-					appDataATOCommand.setSectionRunAdjustCmd(0);//区间运行时间默认值
-				}
-			}
-			sender.sendATOCommand(appDataATOCommand);
-			/*sender.sendATOCommand(appDataATOCommand);
-			sender.sendATOCommand(appDataATOCommand);
-			sender.sendATOCommand(appDataATOCommand);*/
-		}catch (Exception e) {
-			// TODO: handle exception
-			LOG.error("[trace.judgehasATOcommad] traceData parse error!");
-			e.printStackTrace();
-		}
-		watch.stop();
-		LOG.info("[trace.judgehasATOcommad] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
 	private Integer convertNextPlatformId(Integer nextPlatformId){

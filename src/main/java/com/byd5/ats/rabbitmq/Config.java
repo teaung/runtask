@@ -149,10 +149,6 @@ public class Config{
 			return new AnonymousQueue();
 		}
 		@Bean
-		public Queue queueTraceJudgeATO() {
-			return new AnonymousQueue();
-		}
-		@Bean
 		public Queue queueTraceStationLeave() {
 			return new AnonymousQueue();
 		}
@@ -186,11 +182,6 @@ public class Config{
 		public Binding bindingTraceTransformArrive(@Qualifier("exchangeTrace") TopicExchange ex,Queue queueTraceTransformArrive) {
 			return BindingBuilder.bind(queueTraceTransformArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_TRANSFORM);
 		}	
-		// 离开折返轨
-		@Bean
-		public Binding bindingTraceJudgeATO(@Qualifier("exchangeTrace") TopicExchange ex,Queue queueTraceJudgeATO) {
-			return BindingBuilder.bind(queueTraceJudgeATO).to(ex).with(RuntaskConstant.RABB_RK_TRACE_JUDGEATO);
-		}
 		
 		@Bean
 		public ReceiverTrace receiverTrace() {

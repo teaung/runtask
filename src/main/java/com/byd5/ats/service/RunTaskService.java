@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
@@ -17,8 +18,8 @@ import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
 import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
-import com.byd5.ats.utils.DstCodeEnum;
-import com.byd5.ats.utils.RuntaskConstant;
+import com.byd5.ats.utils.RuntaskUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +38,9 @@ public class RunTaskService{
 	
 	@Autowired
 	private TrainrungraphHystrixService rungraphHystrixService;
+	
+	@Autowired
+	private RuntaskUtils runtaskUtils;
 	
 	/**
 	 * 运行任务map：以车组号为key，TrainRunTask类为value
@@ -73,6 +77,222 @@ public class RunTaskService{
 	}
 	
 	/**
+	 * 非计划车在区间运行时发送ATO命令
+	 * @param event
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationSectionUnplan(TrainEventPosition event) {
+		LOG.info("--getStationSectionUnplan--start");
+		Integer platformId = event.getNextStationId();//下一站
+		//1、跳停判断
+		AppDataAVAtoCommand cmd = getStationSkipUnplan(event, platformId);
+		LOG.info("--getStationSectionUnplan--end");
+		return cmd;
+	}
+	
+	/**
+	 * 非计划车进站发送ATO命令
+	 * @param event
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationEnterUnplan(TrainEventPosition event) {
+		LOG.info("--getStationEnterUnplan--start");
+		Integer platformId = event.getStation();//当前站
+		//1、再次更新默认ATO的Map
+		getStationUnplan(event, platformId);
+		//2、扣车判断
+		AppDataAVAtoCommand cmd = getStationDetainUnplan(event, platformId);
+		if(cmd == null){
+			return null;
+		}
+		//3、跳停判断
+		if(cmd.getDetainCmd() != 0x55){
+			cmd = getStationSkipUnplan(event, platformId);
+		}
+		LOG.info("--getStationEnterUnplan--end");
+		return cmd;
+	}
+	
+	/**
+	 * 非计划车在站台上时发送ATO命令
+	 * @param event
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationArriveUnplan(TrainEventPosition event) {
+		LOG.info("--getStationArriveUnplan--start");
+		Integer platformId = event.getStation();//当前站
+		//1、扣车判断
+		AppDataAVAtoCommand cmd = getStationDetainUnplan(event, platformId);
+		if(cmd == null){
+			return null;
+		}
+		//2、跳停判断
+		if(cmd.getDetainCmd() != 0x55){
+			cmd = getStationSkipUnplan(event, platformId);
+		}
+		LOG.info("--getStationArriveUnplan--end");
+		return cmd;
+	}
+	
+	/**
+	 * 非计划车离站
+	 * @param event
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationLeaveUnplan(TrainEventPosition event) {
+		LOG.info("--getStationLeaveUnplan--start");
+		Integer platformId = event.getNextStationId();//下一站
+		//1、更新默认ATO为下一站的Map
+		getStationUnplan(event, platformId);
+		//2、跳停判断
+		AppDataAVAtoCommand cmd = getStationSkipUnplan(event, platformId);
+		LOG.info("--getStationLeaveUnplan--end");
+		return cmd;
+	}
+	
+	/**
+	 * 非计划车，离站时，保存至公共map中，发当前站停站时间，下一站区间运行时间(默认无扣车跳停)
+	 * @param event
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationUnplan(TrainEventPosition event, Integer platformId) {
+		// TODO Auto-generated method stub
+		LOG.info("--getStationUnplan--start");
+		/**ATO命令信息*/
+		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
+		
+		/**初始化ATO命令数据为默认值*/
+		cmd = initAtoCommand(cmd);
+		
+		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
+		cmd.setCargroupLineNum(event.getCargroupLineNum());
+		cmd.setCargroupNum(event.getCargroupNum());
+		cmd.setTrainNum(event.getTrainNum());
+		/**设置目的地号为终点站站台ID*/
+		cmd.setDstCode(runtaskUtils.convertDstCode2Char(event.getDstCode()));
+		cmd.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
+		/** 下一站区间运行时间不会改变，除非有调整*/
+		Integer runtime = traincontrolHystrixService.getDefRunTime(platformId);
+		if(runtime == null){//获取失败，不下发ATO命令
+			return null;
+		}
+		cmd.setSectionRunAdjustCmd(runtime);
+		/**设置默认停车站台ID*/
+		cmd.setNextStopPlatformId(platformId);
+		Integer stopTime = getStopTimeCmdCurr(platformId);
+		if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+			cmd.setPlatformStopTime(stopTime);
+		}
+		else{//车站默认停站时间
+			Integer dwelltime = traincontrolHystrixService.getDefDwellTime(platformId);
+			if(dwelltime == null){
+				return null;
+			}
+			cmd.setPlatformStopTime(dwelltime);
+		}
+		
+		//更新ATO命令
+		updateAtoCmd(cmd);
+		LOG.info("--getStationUnplan--end");		
+		return cmd;
+	}
+	
+	/**
+	 * 获取车站扣车状态命令(非计划车)
+	 * @param event
+	 * @param platformId 
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationDetainUnplan(TrainEventPosition event, Integer platformId) {
+		LOG.info("--getStationDetainUnplan--start");		
+		AppDataAVAtoCommand cmd = getExistAtoCmd(event, platformId);
+		if(cmd == null){
+			return null;
+		}
+		/**当前站台有扣车，设置有扣车命令*/
+		cmd.setDetainCmd(getDtStatusCmd(platformId));
+		LOG.info("--getStationDetainUnplan--end");		
+		return cmd;
+		
+	}
+	
+	/**
+	 * 获取当前站台跳停状态命令(非计划车)
+	 * @param event
+	 * @param platformId 
+	 * @return
+	 */
+	public AppDataAVAtoCommand getStationSkipUnplan(TrainEventPosition event, Integer platformId) {
+		LOG.info("--getStationSkipUnplan--start");		
+		AppDataAVAtoCommand cmd = getExistAtoCmd(event, platformId);
+		if(cmd == null){
+			return null;
+		}
+		
+		//判断当前车站是否有跳停
+		String skipStatusStr = traincontrolHystrixService.getSkipStationStatus(platformId);
+		LOG.info("[getStationSkipUnplan] platformId:{} skipStatus:{}", platformId, skipStatusStr);
+		if(skipStatusStr != null && skipStatusStr.equals("error")){
+			return null;
+		}
+		if(skipStatusStr != null && skipStatusStr.equals("1")){//人工设置跳停
+			cmd.setNextSkipCmd((short) 0x55);
+			cmd.setSkipPlatformId(platformId);
+			cmd = runtaskUtils.setNextStopPlatformId(cmd, platformId, event.getTrainDir(), event.getDstCode());//设置下一停车站台ID
+		}
+		LOG.info("--getStationSkipUnplan--end");		
+		return cmd;
+	}
+
+	private AppDataAVAtoCommand getExistAtoCmd(TrainEventPosition event, Integer platformId) {
+		AppDataAVAtoCommand cmd = mapAtoCmd.get(event.getCargroupNum());
+		if(cmd == null || cmd.getCargroupNum() != event.getCargroupNum()){
+			getStationUnplan(event, platformId);
+			cmd = mapAtoCmd.get(event.getCargroupNum());
+		}
+		AppDataAVAtoCommand result = null;
+		if(cmd != null){
+			result = new AppDataAVAtoCommand();
+			BeanUtils.copyProperties(cmd, result);//拷贝MAP中存储的ATO命令
+		}
+		ObjectMapper mapper = new ObjectMapper(); // 转换器
+		try {
+			LOG.info("[getExistAtoCmd] " + mapper.writeValueAsString(cmd));
+		} catch (JsonProcessingException e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+
+	/**
+	 * 更新列车对应的ATO命令
+	 * @param cmd
+	 */
+	private void updateAtoCmd(AppDataAVAtoCommand cmd) {
+		if(cmd != null){
+			if(mapAtoCmd.containsKey(cmd.getCargroupNum())){
+				mapAtoCmd.replace(cmd.getCargroupNum(), cmd);
+			}
+			else{
+				mapAtoCmd.put(cmd.getCargroupNum(), cmd);
+			}
+		}
+	}
+	
+	/**
+	 * 移除车组号对应的列车ATO命令
+	 * @param groupnum
+	 */
+	private void removeAtoCmd(Integer groupnum) {
+		mapAtoCmd.remove(groupnum);
+	}
+	
+	
+	
+	
+	
+	
+	/**
 	 * 当列车到达折返时，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
 	 * @param event 列车位置信息
 	 * @param task	运行任务信息
@@ -85,6 +305,7 @@ public class RunTaskService{
 
 		/**初始化ATO命令数据为默认值*/
 		cmd = initAtoCommand(cmd);//初始化ATO命令数据
+		cmd.setBackDepotCmd((short) 0xAA);
 		
 		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
 		cmd.setServiceNum(task.getTablenum());
@@ -103,167 +324,31 @@ public class RunTaskService{
 		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);// 最后一条数据为车站数据
 
 		/**设置目的地号为终点站站台ID*/
-		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-		//cmd = convertDstCode2Char(task.getDstStationNum(), cmd);
-		cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
+		cmd.setDstCode(runtaskUtils.convertDstCode2Char(task.getDstStationNum()));
 		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		/**下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件： 1、有人工设置跳停命令 2、或者运行计划有跳停*/
-		cmd = nextStaionSkipStatusProccess(cmd, first);
+		cmd = runtaskUtils.nextStaionSkipStatusProccess(cmd, first);
 		
 		/**(下一站有跳停)设置下一停车站台ID、区间运行时间*/
-		cmd = setNextStopStation(cmd, first, timetableList);
+		cmd = runtaskUtils.setNextStopStation(cmd, first, timetableList);
 		
 		/**有扣车，设置扣车命令*/
 		cmd.setDetainCmd(getDtStatusCmd(first.getNextPlatformId()));
-		//cmd = setDtCmd(cmd);
 		
 		/** 下一站有折返，设置折返命令*/
-		cmd.setTurnbackCmd(covertTurnbackCmd(first));
+		cmd.setTurnbackCmd(runtaskUtils.covertTurnbackCmd(first));
 		
 		LOG.info("--到达折返轨aodCmdReturn--end");
 		return cmd;
 	}
 	
-	
-	/**
-	 * 在区间上升级为通信车，收到运行图发来的车次时刻表后，根据车次时刻表向VOBC发送任务命令（新的车次号、下一站ID）
-	 * @param event 列车位置信息
-	 * @param task	运行任务信息
-	 * @return ATO命令信息
-	 */
-	public AppDataAVAtoCommand aodCmdSection(TrainEventPosition event, TrainRunTask task) {
-		LOG.info("--aodCmdSection--start");
-		/**ATO命令信息*/
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-
-		/**初始化ATO命令数据为默认值*/
-		cmd = initAtoCommand(cmd);//初始化ATO命令数据
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-		cmd.setServiceNum(task.getTablenum());
-		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(task.getLineNum());
-		cmd.setCargroupNum(task.getTraingroupnum());
-		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(task.getTrainnum());
-		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-
-		Integer nextPlatformId = event.getNextStationId();
-		/*if(event.getNextStationId() == 10){//下一站转换轨
-			nextPlatformId = 0;
-		}
-		
-		if(event.getNextStationId() == 9){//下一站折返轨
-			nextPlatformId = 9;
-		}*/
-		
-		/** 当前车次对应的时刻表信息 */
-		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-		
-		/**当前车次的当前站台信息*/
-		TrainRunTimetable currStation = null;
-		
-		/**当前车次的下一站台信息*/
-		TrainRunTimetable nextStation = null;
-		
-		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
-		for (int i = 0; i < timetableList.size(); i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == nextPlatformId) {
-				/*currStation = t;
-				nextStation = timetableList.get(i+1);*/
-				nextStation = t;
-				break;
-			}
-		}
-		
-		
-		/** 当前车次的起始站信息 */
-		TrainRunTimetable first = timetableList.get(1);// 第二条数据为车站数据
-		/** 当前车次的终点站信息 */
-		TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);// 最后一条数据为车站数据
-
-		/**设置目的地号为终点站站台ID*/
-		String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-		//cmd = convertDstCode2Char(task.getDstStationNum(), cmd);
-		cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
-		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
-		
-		if(nextPlatformId != 0){
-			/**下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件： 1、有人工设置跳停命令 2、或者运行计划有跳停*/
-			cmd = nextStaionSkipStatusProccess(cmd, nextStation);
-			
-			/**(下一站有跳停)设置下一停车站台ID、区间运行时间*/
-			cmd = setNextStopStation(cmd, nextStation, timetableList);
-			
-			/** 下一站有折返，设置折返命令*/
-			cmd.setTurnbackCmd(covertTurnbackCmd(nextStation));
-		}
-		
-		
-		/**有扣车，设置扣车命令*/
-		cmd.setDetainCmd(getDtStatusCmd(nextStation.getPlatformId()));
-		//cmd = setDtCmd(cmd);
-		
-		LOG.info("--aodCmdSection--end");
-		return cmd;
-	}
-
-	/** 下一站有折返，设置折返命令: 
-	 * 		站前折返：0x55<br>有人站后折返：0xCC<br>无人自动折返：0xAA<br>不折返：0xFF
-	 * @param nextStation 下一站信息
-	 * @return 折返命令
-	 */
-	private short covertTurnbackCmd(TrainRunTimetable nextStation) {
-		
-		short turnbackCmd = 0xFF;
-		if(nextStation !=null && nextStation.getReturnMode() == 1){
-			turnbackCmd = 0xCC;
-		}
-		return turnbackCmd;
-	}
-	
-
-	/**
-	 * 设置目的地号: 类型转换String->char[]
-	 * 
-	 * @param dstStationNum 运行图目的地号
-	 * @return 转换后的目的地号
-	 */
-	public char[] convertDstCode2Char(String dstStationNum) {
-		int len = 4;
-		char[] code = {' ', ' ', ' ', ' '};
-		char[] dst = dstStationNum.toCharArray();
-		if (dst.length < len) {
-			len = dst.length;
-		}
-		for (int i = 0; i < len; i ++) {
-			code[3-i] = dst[len-1-i];
-		}
-		//cmd.setDstCode(code);
-		return code;
-	}
-
 	/**
 	 * 下一停车站台有扣车，设置有扣车命令
 	 * @param cmd ATO命令信息
 	 * @return ATO命令信息
 	 */
-	/*private AppDataAVAtoCommand setDtCmd(AppDataAVAtoCommand cmd) {
-		*//**下一停车站台ID有扣车3，则设置有扣车命令0x55*//*
-		if(cmd.getNextStopPlatformId() <= 8 && listDtStatus.get(cmd.getNextStopPlatformId()-1) < 3){
-			cmd.setDetainCmd((short) 0x55);
-		}
-		return cmd;
-	}*/
-	
-	/**
-	 * 下一停车站台有扣车，设置有扣车命令
-	 * @param cmd ATO命令信息
-	 * @return ATO命令信息
-	 */
-	private short getDtStatusCmd(Integer platformId) {
+	public short getDtStatusCmd(Integer platformId) {
 		/**下一停车站台ID有扣车3，则设置有扣车命令0x55*/
 		short detainCmd = 0xAA;
 		if(platformId != 0 && platformId != 9){//车站扣车状态,不包括折返轨和转换轨
@@ -277,180 +362,6 @@ public class RunTaskService{
 	}
 	
 	
-	/**
-	 *  当列车到站有早晚点，进行调整，根据列车位置、车次时刻表向VOBC发送下一区间运行命令：设置区间运行等级
-	 * @param task 运行任务
-	 * @param event 列车位置
-	 * @return ATO命令信息
-	 */
-	/*public AppDataAVAtoCommand aodCmdArriveAdjust(TrainRunTask task, TrainEventPosition event) {
-		LOG.info("--aodCmdArriveAdjust--start");
-		*//**ATO命令信息*//*
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-		
-		*//**初始化ATO命令数据为默认值*//*
-		cmd = initAtoCommand(cmd);
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-
-		cmd.setServiceNum(task.getTablenum());
-		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(task.getLineNum());
-		cmd.setCargroupNum(task.getTraingroupnum());
-		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(task.getTrainnum());
-		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-		
-		int platformId = event.getStation();
-
-		*//**当前车次对应的时刻表信息*//*
-		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-
-		*//**当前车次的当前站台信息*//*
-		TrainRunTimetable currStation = null;
-		
-		*//**当前车次的下一站台信息*//*
-		TrainRunTimetable nextStation = null;
-		
-		int timeSectionRun = 0;	//下一站区间运行时间
-		int timeStationStop = 0; // 当前车站站停时间（单位：秒）
-		
-		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
-		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == platformId) {
-				currStation = t;
-				nextStation = timetableList.get(i+1);
-				break;
-			}
-		}
-		
-		*//**有当前站台、下一站台的信息*//*
-		if(currStation != null && nextStation != null){
-			timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
-			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-			*//**当前车次的终点站信息*//*
-			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
-			
-			*//**设置目的地号为终点站站台ID*//*
-			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
-			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
-			
-			*//**若当前车站是终点站，则只发当前车站站停时间*//*
-			if(currStation.getPlatformId() == lastStation.getPlatformId()){
-				cmd.setNextSkipCmd((short) 0xAA);
-				cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
-			}
-			*//**若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间*//*
-			else{
-				cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
-				cmd.setSectionRunAdjustCmd((short) timeSectionRun);// 区间运行等级/区间运行时间
-				
-				*//**当前站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*//*
-				cmd = nextStaionSkipStatusProccess(cmd, currStation);		
-				
-				*//**(下一站有跳停)设置下一停车站台ID、区间运行时间*//*
-				cmd = setNextStopStation(cmd, currStation, timetableList);
-			}
-			
-			
-			cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
-			cmd.setSectionRunAdjustCmd((short) timeSectionRun);// 区间运行等级/区间运行时间
-			
-			*//**当前站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*//*
-			cmd = nextStaionSkipStatusProccess(cmd, currStation);		
-			
-			*//**(下一站有跳停)设置下一停车站台ID、区间运行时间*//*
-			cmd = setNextStopStation(cmd, currStation, timetableList);
-			
-			
-			*//**1、先判断当前车站是否人工设置跳停命令*//*
-			Integer stopTime = getStopTimeIfSkipCurr(platformId);
-			if(stopTime != null){//有跳停
-				cmd.setPlatformStopTime(stopTime);
-			}
-			*//**2、否则如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间*//*
-			else{//
-				stopTime = getStopTimeCmdCurr(platformId);
-				if(stopTime != null){
-					cmd.setPlatformStopTime(stopTime);
-				}
-			}
-			*//**2、否则如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间*//*
-			Integer stopTime = getStopTimeCmdCurr(platformId);
-			if(stopTime != null){
-				cmd.setPlatformStopTime(stopTime);
-			}
-			
-			*//** 当前站有折返，设置折返命令*//*
-			cmd.setTurnbackCmd(covertTurnbackCmd(currStation));
-		}
-		else{
-			LOG.error("[aodCmdEnter]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
-			return null;
-		}
-		
-		*//**当前站台有扣车，设置有扣车命令*//*
-		cmd.setDetainCmd(getDtStatusCmd(currStation.getPlatformId()));
-		//cmd = setDtCmd(cmd);
-		if(cmd.getNextSkipCmd() == 0x55 || cmd.getDetainCmd() == 0x55){//有跳停或扣车
-			cmd.setPlatformStopTime(0xFFFF);
-		}
-		
-		LOG.info("--aodCmdArriveAdjust--end");		
-		return cmd;
-	}*/
-	
-	/**区间设置跳停
-	 * 
-	 * @param task
-	 * @param event
-	 * @return
-	 */
-	public AppDataAVAtoCommand aodCmdStationSectionSkip(TrainRunTask task, TrainEventPosition event) {
-		LOG.info("--aodCmdStationSectionSkip--start");
-		
-		//获取离站时发送的ATO命令
-		AppDataAVAtoCommand cmd = mapAtoCmd.get(event.getCargroupNum());
-		if(cmd == null){
-			cmd = getStaionSectionAtoCmd(task, event);
-			if(cmd == null){//为空则无对应计划，返回null，不下发ATO
-				LOG.info("--aodCmdStationSectionSkip--end");
-				return null;
-			}
-		}
-		
-		//判断下一车站是否有跳停
-		/**当前车次对应的时刻表信息*/
-		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-
-		/**当前车次的下一站台信息*/
-		TrainRunTimetable nextStation = null;
-		
-		/**获取当前车次时刻表的对应当前站台的下一站台的信息*/
-		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == event.getNextStationId()) {
-				nextStation = timetableList.get(i);
-				break;
-			}
-		}
-		
-		/**有当前站台对应下一站台的信息*/
-		if(nextStation != null){
-			/** 下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID */
-			cmd = nextStaionSkipStatusProccess(cmd, nextStation);
-			/**(下一站有跳停)设置下一停车站台ID*/
-			cmd = setNextStopStation(cmd, nextStation, timetableList);
-		}
-		else{
-			LOG.error("[aodCmdStationSectionSkip]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
-			LOG.info("--aodCmdStationSectionSkip--end");	
-			return null;
-		}
-		LOG.info("--aodCmdStationSectionSkip--end");		
-		return cmd;
-	}
 	
 	/**
 	 *  当列车进站，根据列车位置、车次时刻表向VOBC发送当前区间运行命令：设置区间运行等级
@@ -460,27 +371,24 @@ public class RunTaskService{
 	 */
 	public AppDataAVAtoCommand aodCmdStationEnter(TrainRunTask task, TrainEventPosition event) {
 		LOG.info("--aodCmdStationEnter--start");
+		/**ATO命令信息*/
+		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 		
-		//获取离站时发送的ATO命令
-		AppDataAVAtoCommand cmd = mapAtoCmd.get(event.getCargroupNum());
-		if(cmd == null){
-			cmd = getStaionAodCmd(task, event);
-			if(cmd == null){//为空则无对应计划，返回null，不下发ATO
-				LOG.info("--aodCmdStationEnter--end");
-				return null;
-			}
-		}
+		/**初始化ATO命令数据为默认值*/
+		cmd = initAtoCommand(cmd);
+		cmd.setBackDepotCmd((short) 0xAA);
 		
-		//判断是否有扣车
-		/**站台有扣车，设置有扣车命令*/
-		cmd.setDetainCmd(getDtStatusCmd(event.getStation()));
+		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
+		cmd.setServiceNum(task.getTablenum());
+		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
+		cmd.setCargroupLineNum(task.getLineNum());
+		cmd.setCargroupNum(task.getTraingroupnum());
+		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
+		cmd.setTrainNum(task.getTrainnum());
+		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
 		
-		if(cmd.getDetainCmd() == 0x55){//有扣车,发送扣车命令
-			//cmd.setPlatformStopTime(0xFFFF);
-			return cmd;
-		}
-		
-		//判断当前车站是否有跳停
+		int platformId = event.getStation();
+
 		/**当前车次对应的时刻表信息*/
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
@@ -490,64 +398,10 @@ public class RunTaskService{
 		/**当前车次的下一站台信息*/
 		TrainRunTimetable nextStation = null;
 		
-		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
-		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == event.getStation()) {
-				currStation = t;
-				nextStation = timetableList.get(i+1);
-				break;
-			}
-		}
-		
-		/**有当前站台、下一站台的信息*/
-		if(currStation != null && nextStation != null){
-			/** 下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID */
-			cmd = nextStaionSkipStatusProccess(cmd, currStation);
-			/**(下一站有跳停)设置下一停车站台ID*/
-			cmd = setNextStopStation(cmd, currStation, timetableList);
-		}
-		else{
-			LOG.error("[aodCmdEnter]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
-			LOG.info("--aodCmdStationEnter--end");	
-			return null;
-		}
-		LOG.info("--aodCmdStationEnter--end");		
-		return cmd;
-	}
-	/*public AppDataAVAtoCommand aodCmdStationEnter(TrainRunTask task, TrainEventPosition event) {
-		LOG.info("--aodCmdStationEnter--start");
-		*//**ATO命令信息*//*
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-		
-		*//**初始化ATO命令数据为默认值*//*
-		cmd = initAtoCommand(cmd);
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-
-		cmd.setServiceNum(task.getTablenum());
-		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(task.getLineNum());
-		cmd.setCargroupNum(task.getTraingroupnum());
-		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(task.getTrainnum());
-		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-		
-		int platformId = event.getStation();
-
-		*//**当前车次对应的时刻表信息*//*
-		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-
-		*//**当前车次的当前站台信息*//*
-		TrainRunTimetable currStation = null;
-		
-		*//**当前车次的下一站台信息*//*
-		TrainRunTimetable nextStation = null;
-		
 		int timeStationStop = 0;	//停站时间
 		int timeSectionRun = 0;	//下一站区间运行时间
 		
-		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
+		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
 		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
@@ -557,27 +411,27 @@ public class RunTaskService{
 			}
 		}
 		
-		*//**有当前站台、下一站台的信息*//*
+		/**有当前站台、下一站台的信息*/
 		if(currStation != null && nextStation != null){
-			*//**当前车次的终点站信息*//*
+			/**当前车次的终点站信息*/
 			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
 			
 			timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
 			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 			
-			*//**设置目的地号为终点站站台ID*//*
-			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
+			/**设置目的地号为终点站站台ID*/
+			cmd.setDstCode(runtaskUtils.convertDstCode2Char(task.getDstStationNum()));
 			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 			
 			cmd.setPlatformStopTime(timeStationStop);
 			cmd.setSectionRunAdjustCmd(timeSectionRun);// 区间运行等级/区间运行时间
 			
 			//判断当前车站是否有跳停
-			*//**下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*//*
-			cmd = nextStaionSkipStatusProccess(cmd, currStation);
+			/**下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*/
+			cmd = runtaskUtils.nextStaionSkipStatusProccess(cmd, currStation);
 			
-			*//**若当前车站是终点站，则只发当前车站站停时间*//*
-			if(currStation.getPlatformId() == lastStation.getPlatformId()){
+			/**若当前车站是终点站，则只发当前车站站停时间*/
+			/*if(currStation.getPlatformId() == lastStation.getPlatformId()){
 				cmd.setNextSkipCmd((short) 0xAA);
 				cmd.setSectionRunAdjustCmd(0);// 区间运行等级/区间运行时间
 				//cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
@@ -586,26 +440,26 @@ public class RunTaskService{
 			else{
 				*//**(下一站有跳停)设置下一停车站台ID、区间运行时间*//*
 				cmd = setNextStopStation(cmd, currStation, timetableList);
-			}
+			}*/
 			
-			*//**(下一站有跳停)设置下一停车站台ID、区间运行时间*//*
-			cmd = setNextStopStation(cmd, currStation, timetableList);
+			/**(下一站有跳停)设置下一停车站台ID、区间运行时间*/
+			cmd = runtaskUtils.setNextStopStation(cmd, currStation, timetableList);
 			
-			*//** 下一站有折返，设置折返命令*//*
-			cmd.setTurnbackCmd(covertTurnbackCmd(currStation));
+			/** 下一站有折返，设置折返命令*/
+			cmd.setTurnbackCmd(runtaskUtils.covertTurnbackCmd(currStation));
 			
-			*//**下一停车站台有扣车，设置有扣车命令*//*
+			/**下一停车站台有扣车，设置有扣车命令*/
 			cmd.setDetainCmd(getDtStatusCmd(currStation.getPlatformId()));
 			//cmd = setDtCmd(cmd);
 			
 			if(cmd.getNextSkipCmd() == 0x55 || cmd.getDetainCmd() == 0x55){//有跳停或扣车
 				cmd.setPlatformStopTime(0xFFFF);
 			}
-			else{
+			/*else{
 				LOG.error("[aodCmdStationEnter]--this trainnum {} doesn't have skipCmd or detainCmd in this station {}, so discard", event.getTrainNum(),event.getStation());
 				LOG.info("--aodCmdStationEnter--end");		
 				return null;
-			}
+			}*/
 				
 		}else{
 			LOG.error("[aodCmdEnter]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
@@ -615,7 +469,8 @@ public class RunTaskService{
 			
 		LOG.info("--aodCmdStationEnter--end");		
 		return cmd;
-	}*/
+	}
+	
 	
 	/**
 	 *  当列车到站(不管是否停稳)，根据列车位置、车次时刻表向VOBC发送下一区间运行命令：设置区间运行等级
@@ -625,55 +480,14 @@ public class RunTaskService{
 	 */
 	public AppDataAVAtoCommand aodCmdStationLeave(TrainRunTask task, TrainEventPosition event) {
 		LOG.info("--aodCmdStationLeave--start");
-		
-		//获取离站时发送的ATO命令
-		AppDataAVAtoCommand cmd = getStaionAodCmd(task, event);
-		if(cmd == null){//为空则无对应计划，返回null，不下发ATO
-			LOG.info("--aodCmdStationLeave--end");
-			return null;
-		}
-		
-		//判断下一车站是否有跳停
-		/**当前车次对应的时刻表信息*/
-		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-
-		/**当前车次的下一站台信息*/
-		TrainRunTimetable nextStation = null;
-		
-		/**获取当前车次时刻表的对应当前站台的下一站台的信息*/
-		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
-			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == event.getStation()) {
-				nextStation = timetableList.get(i+1);
-				break;
-			}
-		}
-		
-		/**有当前站台对应下一站台的信息*/
-		if(nextStation != null){
-			/** 下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID */
-			cmd = nextStaionSkipStatusProccess(cmd, nextStation);
-			/**(下一站有跳停)设置下一停车站台ID*/
-			cmd = setNextStopStation(cmd, nextStation, timetableList);
-		}
-		else{
-			LOG.error("[aodCmdStationLeave]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
-			LOG.info("--aodCmdStationLeave--end");	
-			return null;
-		}
-		LOG.info("--aodCmdStationLeave--end");		
-		return cmd;
-	}
-	/*public AppDataAVAtoCommand aodCmdStationLeave(TrainRunTask task, TrainEventPosition event) {
-		LOG.info("--aodCmdStationLeave--start");
-		*//**ATO命令信息*//*
+		/**ATO命令信息*/
 		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 		
-		*//**初始化ATO命令数据为默认值*//*
+		/**初始化ATO命令数据为默认值*/
 		cmd = initAtoCommand(cmd);
+		cmd.setBackDepotCmd((short) 0xAA);
 		
 		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-
 		cmd.setServiceNum(task.getTablenum());
 		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
 		cmd.setCargroupLineNum(task.getLineNum());
@@ -684,19 +498,19 @@ public class RunTaskService{
 		
 		int platformId = event.getStation();
 
-		*//**当前车次对应的时刻表信息*//*
+		/**当前车次对应的时刻表信息*/
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
-		*//**当前车次的当前站台信息*//*
+		/**当前车次的当前站台信息*/
 		TrainRunTimetable currStation = null;
 		
-		*//**当前车次的下一站台信息*//*
+		/**当前车次的下一站台信息*/
 		TrainRunTimetable nextStation = null;
 		
 		int timeSectionRun = 0;	//下一站区间运行时间
 		int timeStationStop = 0; // 当前车站站停时间（单位：秒）
 		
-		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
+		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
 		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
@@ -706,42 +520,42 @@ public class RunTaskService{
 			}
 		}
 		
-		*//**有当前站台、下一站台的信息*//*
+		/**有当前站台、下一站台的信息*/
 		if(currStation != null && nextStation != null){
 			timeStationStop = (int) ((currStation.getPlanLeaveTime() - currStation.getPlanArriveTime())/1000); // 当前车站站停时间（单位：秒）
 			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-			*//**当前车次的终点站信息*//*
+			/**当前车次的终点站信息*/
 			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
 			
-			*//**设置目的地号为终点站站台ID*//*
+			/**设置目的地号为终点站站台ID*/
 			String endPlatformId = String.valueOf(lastStation.getPlatformId());//终点站站台ID
-			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
+			cmd.setDstCode(runtaskUtils.convertDstCode2Char(task.getDstStationNum()));
 			//cmd.setDstCode(endPlatformId.toCharArray());
 			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 			
-			*//**若当前车站是终点站，则只发当前车站站停时间*//*
+			/**若当前车站是终点站，则只发当前车站站停时间*/
 			if(currStation.getPlatformId() == lastStation.getPlatformId()){
 				cmd.setNextSkipCmd((short) 0xAA);
 				cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
 			}
-			*//**若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间*//*
+			/**若当前车站不是终点站，则发当前车站站停时间，下一站台ID，下一站区间运行时间*/
 			else{
 				cmd.setPlatformStopTime(timeStationStop); //计划站停时间（单位：秒）
 				cmd.setSectionRunAdjustCmd((short) timeSectionRun);// 区间运行等级/区间运行时间
 				
-				*//**下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*//*
-				cmd = nextStaionSkipStatusProccess(cmd, nextStation);		
+				/**下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID*/
+				cmd = runtaskUtils.nextStaionSkipStatusProccess(cmd, nextStation);	
 				
-				*//**(下一站有跳停)设置下一停车站台ID、区间运行时间*//*
-				cmd = setNextStopStation(cmd, currStation, timetableList);
+				/**(下一站有跳停)设置下一停车站台ID、区间运行时间*/
+				cmd = runtaskUtils.setNextStopStation(cmd, currStation, timetableList);
 			}
 			
-			*//**1、先判断当前车站是否人工设置跳停命令*//*
-			Integer stopTime = getStopTimeIfSkipCurr(platformId);
+			/**1、先判断当前车站是否人工设置跳停命令*/
+			Integer stopTime = runtaskUtils.getStopTimeIfSkipCurr(platformId);
 			if(stopTime != null){//有跳停
 				cmd.setPlatformStopTime(stopTime);
 			}
-			*//**2、否则如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间*//*
+			/**2、否则如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间*/
 			else{//
 				stopTime = getStopTimeCmdCurr(platformId);
 				if(stopTime != null){
@@ -749,25 +563,24 @@ public class RunTaskService{
 				}
 			}
 			
-			*//** 下一站有折返，设置折返命令*//*
-			cmd.setTurnbackCmd(covertTurnbackCmd(nextStation));
+			/** 下一站有折返，设置折返命令*/
+			cmd.setTurnbackCmd(runtaskUtils.covertTurnbackCmd(nextStation));
 			
-			//(下一站有跳停)设置下一停车站台ID、区间运行时间
-			cmd = setNextStopStation(cmd, currStation, timetableList);
+			/*//(下一站有跳停)设置下一停车站台ID、区间运行时间
+			cmd = setNextStopStation(cmd, currStation, timetableList);*/
 		}
 		else{
 			LOG.error("[aodCmdStationLeave]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
 			return null;
 		}
 		
-		*//**下一停车站台有扣车，设置有扣车命令*//*
+		/**下一停车站台有扣车，设置有扣车命令*/
 		cmd.setDetainCmd(getDtStatusCmd(nextStation.getPlatformId()));
 		//cmd = setDtCmd(cmd);
 		
 		LOG.info("--aodCmdStationLeave--end");		
 		return cmd;
-	}*/
-
+	}
 	
 	/**
 	 * * 当列车到站停稳时，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向客户端发送列车站停时间
@@ -808,7 +621,7 @@ public class RunTaskService{
 		appDataStationTiming.setTime(timeStationStop); //计划站停时间（单位：秒）
 		
 		//1、先判断当前车站是否人工设置跳停命令
-		Integer stopTime = getStopTimeIfSkipCurr(platformId);
+		Integer stopTime = runtaskUtils.getStopTimeIfSkipCurr(platformId);
 		if(platformId != 6 
 				&& stopTime != null && stopTime == 0xFFFF){//有跳停
 			appDataStationTiming.setTime(0x0000);//设置站停时间（单位：秒）
@@ -835,71 +648,34 @@ public class RunTaskService{
 		AppDataStationTiming appDataStationTiming = new AppDataStationTiming();
 		
 		/**当前站台有扣车，不发发车倒计时*/
-		short detainCmd = getDtStatusCmd(event.getStation());
+		/*short detainCmd = getDtStatusCmd(event.getStation());
 		if(detainCmd == 0x55){//有扣车
-			LOG.info("--aodCmdStationEnter--end");		
+			LOG.info("--appDataStationTimingUnplan--end");		
 			return null;
+		}*/
+		
+		appDataStationTiming.setStation_id(event.getStation());
+		
+		AppDataAVAtoCommand cmd = mapAtoCmd.get(event.getCargroupNum());
+		if(cmd != null && cmd.getNextStopPlatformId() == event.getStation()){
+			appDataStationTiming.setTime(cmd.getPlatformStopTime());
 		}
-		
-		Integer platformId = event.getStation();
-
-		appDataStationTiming.setStation_id(platformId);
-//		appDataStationTiming.setTime(RuntaskConstant.DEF_DWELL_TIME); //计划站停时间（单位：秒）
-		appDataStationTiming.setTime(getDefDwellTime(platformId)); //计划站停时间（单位：秒）
-		
-		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-		Integer stopTime = getStopTimeCmdCurr(event.getStation());
-		if(stopTime != null){
-			appDataStationTiming.setTime(stopTime);
+		else{
+			Integer stopTime = getStopTimeCmdCurr(event.getStation());//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+			if(stopTime != null){
+				appDataStationTiming.setTime(stopTime);
+			}
+			else{
+				stopTime = traincontrolHystrixService.getDefDwellTime(event.getStation());
+				if(stopTime == null){
+					return null;
+				}
+				appDataStationTiming.setTime(stopTime); //计划站停时间（单位：秒）
+			}
 		}
-		
 		LOG.info("--appDataStationTimingUnplan--end");		
 		return appDataStationTiming;
 	}
-	
-	
-	/**
-	 * (非计划车)当列车到站(不管是否停稳)后，收到识别跟踪发来的列车位置报告事件后，根据车次时刻表向VOBC发送当前车站(默认)站停时间
-	 * @param event
-	 * @return
-	 * @throws IOException 
-	 * @throws JsonMappingException 
-	 * @throws JsonParseException 
-	 */
-	/*public AppDataAVAtoCommand aodCmdEnterUnplan(TrainEventPosition event) {
-		LOG.info("--aodCmdEnterUnplan--start");
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-		cmd.setServiceNum((short) 0xFF);
-		cmd.setLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(RuntaskConstant.NID_LINE);
-		cmd.setCargroupNum((short) event.getCargroupNum());
-		cmd.setSrcLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
-		cmd.setTrainNum((short) 0000);
-		cmd.setDstLineNum(RuntaskConstant.NID_LINE); // ??? need rungraph supply!
-		
-		cmd.setPlanDir((short) ((event.getTrainDir()==0)?0xAA:0x55)); 
-		
-		cmd.setNextSkipCmd((short) 0xAA);
-		cmd.setPlatformStopTime(RuntaskConstant.DEF_DWELL_TIME); //计划站停时间（单位：秒）默认30s
-		
-		//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-		Integer stopTime = isArtificialStopCurr(event.getStation());
-		if(stopTime != null){
-			cmd.setPlatformStopTime(stopTime);
-		}
-		
-		Integer nextPlatformId = event.getNextStationId();
-		cmd.setNextStopPlatformId(nextPlatformId);
-		
-		//有扣车，设置扣车命令
-		cmd = setDtCmd(cmd);
-		
-		LOG.info("--aodCmdEnterUnplan--end");
-		return cmd;
-	}*/
-	
 	
 	
 	/**
@@ -913,6 +689,7 @@ public class RunTaskService{
 		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 		
 		cmd = initAtoCommand(cmd);//初始化数据
+		cmd.setBackDepotCmd((short) 0xAA);
 
 		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
 		cmd.setServiceNum((short) trainRunInfo.getTablenum());
@@ -924,7 +701,7 @@ public class RunTaskService{
 		cmd.setDstLineNum((short) trainRunInfo.getLineNum()); // ??? need rungraph supply!
 		
 		//cmd.setDstCode(0);	//填啥？
-		cmd.setDstCode(convertDstCode2Char(trainRunInfo.getDstStationNum()));
+		cmd.setDstCode(runtaskUtils.convertDstCode2Char(trainRunInfo.getDstStationNum()));
 		cmd.setPlanDir((short) ((trainRunInfo.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
 		//列车到达折返轨时，只发下一站台ID
@@ -956,94 +733,7 @@ public class RunTaskService{
 		}
 		return result;
 	}
-	
-	/**
-	 * 当前车站人工设置跳停命令,停站时间为0
-	 * @param platformId 站台ID
-	 * @return 停站时间	若有跳停则停站时间为0，否则返回null
-	 */
-	public Integer getStopTimeIfSkipCurr(int platformId){
-		Integer result = null;
-		/*if(platformId == 6){
-			return result;
-		}*/
-		String skipStatus = traincontrolHystrixService.getSkipStationStatus(platformId);
-		if(skipStatus != null && skipStatus.equals("1")){//1:有跳停,0:无跳停
-			//cmd.setStationStopTime(0x0001); //计划站停时间（单位：秒）
-			result = 0xFFFF;
-		}
-		return result;
-	}
-	
-	/**
-	 * (若下一站有跳停)设置下一停车站台ID、区间运行时间
-	 * @param cmd ATO命令信息
-	 * @param currStation 当前站台信息
-	 * @param timetableList 车次时刻表
-	 * @return ATO 命令信息
-	 */
-	public AppDataAVAtoCommand setNextStopStation(AppDataAVAtoCommand cmd, TrainRunTimetable currStation, List<TrainRunTimetable> timetableList) {
-		AppDataAVAtoCommand atoCmd = cmd;
-		if(atoCmd.getNextSkipCmd() == 0x55  
-				&& currStation.getPlatformId()!= 0 
-				&& currStation.getPlatformId() != 9){//有跳停,则获取跳停站台后的第一个停车站台
-			int nextPlatformId = currStation.getNextPlatformId();
-			int runtime = 0; //区间运行时间
-			long stoptime = 0;//停站时间
-			for (int i = 1; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
-				TrainRunTimetable nextStation = timetableList.get(i);
-				if (nextStation.getPlatformId() == nextPlatformId){
-					String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
-					System.out.println("platformId:"+nextPlatformId+" skipStatus:"+skipStatusStr1);
-					runtime += (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-					if(!nextStation.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-						atoCmd.setNextStopPlatformId(nextStation.getPlatformId());
-						//atoCmd.setSectionRunAdjustCmd((short) runtime);
-						stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
-						atoCmd.setPlatformStopTime((int) stoptime);
-						break;
-					}
-					if(nextPlatformId == 6 && (nextStation.isSkip() || skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-						atoCmd.setNextStopPlatformId(nextStation.getPlatformId());
-						//atoCmd.setSectionRunAdjustCmd((short) runtime);
-						stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
-						atoCmd.setPlatformStopTime((int) stoptime);
-						break;
-					}
-					nextPlatformId = nextStation.getNextPlatformId();
-					currStation = timetableList.get(i);
-				}
-			}
-		}
-		return atoCmd;
-	}
-	
-	/**
-	 * 下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件：
-	 * 		1、有人工设置跳停命令
-	 * 		2、或者运行计划有跳停
-	 * @param cmd ATO命令信息
-	 * @param nextStation 下一站台信息
-	 * @return ATO命令信息
-	 */
-	public AppDataAVAtoCommand nextStaionSkipStatusProccess(AppDataAVAtoCommand cmd, TrainRunTimetable nextStation){
-		//下一站有人工设置跳停命令或者运行计划有跳停
-		AppDataAVAtoCommand atoCmd = cmd;
-		/**从运行控制模块获取站台跳停状态信息*/
-		String skipStatusStr = traincontrolHystrixService.getSkipStationStatus(nextStation.getPlatformId());
-		LOG.info("[StaionSkipStatus] platformId:{} skipStatus:{}", nextStation.getPlatformId(), skipStatusStr);
-		if(nextStation.getPlatformId() != 6 && skipStatusStr != null && skipStatusStr.equals("1") //人工设置跳停
-				|| nextStation.isSkip()){//运行计划有跳停
-			atoCmd.setNextSkipCmd((short) 0x55);
-			atoCmd.setSkipPlatformId(nextStation.getPlatformId());
-		}
-		else {//下一站无跳停
-			atoCmd.setNextSkipCmd((short) 0xAA);
-			atoCmd.setNextStopPlatformId(nextStation.getPlatformId());
-		}
-		return atoCmd;
-	}
-	
+
 	
 	/**
 	 * 更新运行任务列表
@@ -1219,29 +909,29 @@ public class RunTaskService{
 		cmd.setLength((short) 50);
 //		cmd.setServiceNum(0xFF);
 		cmd.setServiceNum(0);
-		cmd.setLineNum(0);
+		cmd.setLineNum(0x40);
 		cmd.setNextZcId(0);;
 		cmd.setNextCiId(0);
 		cmd.setNextAtsId(0);
-		cmd.setCargroupLineNum(0xFF);
+		cmd.setCargroupLineNum(0x40);
 		cmd.setCargroupNum((short) 0);
-		cmd.setSrcLineNum(0xFF);
-		cmd.setTrainNum((short) 0xFF);
-		cmd.setDstLineNum(0xFF);
+		cmd.setSrcLineNum(0xFFFF);//?0x40
+		cmd.setTrainNum((short) 0x0000);
+		cmd.setDstLineNum(0xFFFF);
 		char[] dstCode = {' ',' ',' ',' '};
 		cmd.setDstCode(dstCode);//0xFFFF
 		cmd.setPlanDir((short) 0xFF);
 		cmd.setNextStopPlatformId(0xFFFF);
-		cmd.setPlatformStopTime(0xFFFF);
+		cmd.setPlatformStopTime(0);
 		cmd.setSkipPlatformId(0xFFFF);
-		cmd.setNextSkipCmd((short) 0xFF);
+		cmd.setNextSkipCmd((short) 0xAA);
 		cmd.setSectionRunAdjustCmd(0);
 		cmd.setDetainCmd((short) 0xAA);
 		cmd.setTurnbackCmd((short) 0xFF);//站前折返：0x55
 										//有人站后折返：0xCC
 										//无人自动折返：0xAA
 										//不折返：0xFF
-		cmd.setBackDepotCmd((short) 0xAA);	//回段：0x55 不回段：0xAA 默认值：0xFF[注5]当列车最大安全前端不在转换轨内或列车不为回段方向时， ATS向VOBC发送的“回段指示”字段为默认值；
+		cmd.setBackDepotCmd((short) 0xFF);	//回段：0x55 不回段：0xAA 默认值：0xFF[注5]当列车最大安全前端不在转换轨内或列车不为回段方向时， ATS向VOBC发送的“回段指示”字段为默认值；
 											//当列车最大安全前端在转换轨内且列车为回段方向时，对于计划列车，ATS根据列车运行计划，向VOBC发送“回段”或“不回段”提示，对于非计划列车，ATS向VOBC发送默认值；
 											//VOBC与ATS通信正常且收到的回段提示字段非默认值时，根据ATS回段提示信息，判断在转换轨内是否显示回段提示；VOBC与ATS通信断开或收到的回段提示字段为默认值时，根据电子地图配置的区段属性，在转换轨内显示回段提示。
 		cmd.setDoorctrlStrategy((short) 0xFF);
@@ -1249,288 +939,14 @@ public class RunTaskService{
 		return cmd;
 	}
 
-	/**
-	 * 非计划车进站时，发当前站停站时间，下一站区间运行时间
-	 * @param event
-	 * @return
-	 */
-	public AppDataAVAtoCommand aodCmdStationEnterUnplan(TrainEventPosition event) {
-		// TODO Auto-generated method stub
-
-		LOG.info("--aodCmdStationEnter--start");
-		/**ATO命令信息*/
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-		
-		/**初始化ATO命令数据为默认值*/
-		cmd = initAtoCommand(cmd);
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-
-		//cmd.setServiceNum(task.getTablenum());
-		//cmd.setLineNum(event.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(event.getCargroupLineNum());
-		cmd.setCargroupNum(event.getCargroupNum());
-		//cmd.setSrcLineNum(event.getSrcLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(event.getTrainNum());
-		//cmd.setDstLineNum(event.getDstLineNum()); // ??? need rungraph supply!
-		
-		/**设置目的地号为终点站站台ID*/
-		cmd.setDstCode(convertDstCode2Char(event.getDstCode()));
-		cmd.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
-		
-		/** 设置默认停站时间、下一站区间运行时间*/
-		cmd.setSectionRunAdjustCmd(getDefRunTime(event.getStation()));
-		/**设置默认停车站台ID*/
-		cmd.setNextStopPlatformId(event.getStation());
-		
-		//1、扣车状态
-		/**当前站台有扣车，设置有扣车命令*/
-		cmd.setDetainCmd(getDtStatusCmd(event.getStation()));
-		if(cmd.getDetainCmd() == 0x55){//有扣车，设置扣车，停站时间为默认值
-			cmd.setPlatformStopTime(0xFFFF);
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//无扣车
-			Integer stopTime = getStopTimeCmdCurr(event.getStation());
-			if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-				cmd.setPlatformStopTime(stopTime);
-			}
-			else{//车站默认停站时间
-				cmd.setPlatformStopTime(getDefDwellTime(event.getStation()));
-			}
-			
-		}
-		
-		//2、无扣车，看跳停状态
-		//判断当前车站是否有跳停
-		String skipStatusStr = traincontrolHystrixService.getSkipStationStatus(event.getStation());
-		LOG.info("[StaionSkipStatus] platformId:{} skipStatus:{}", event.getStation(), skipStatusStr);
-		if(skipStatusStr != null && skipStatusStr.equals("1")){//人工设置跳停
-			cmd.setNextSkipCmd((short) 0x55);
-			cmd.setSkipPlatformId(event.getStation());
-			cmd.setPlatformStopTime(0xFFFF);
-			cmd = setNextStopPlatformId(cmd, event.getStation(), event.getTrainDir(), event.getDstCode());//设置下一停车站台ID
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//当前站无跳停
-			cmd.setNextSkipCmd((short) 0xAA);//设置无跳停
-		}
-			
-		LOG.info("--aodCmdStationEnter--end");		
-		return cmd;
-	}
-
-	public AppDataAVAtoCommand aodCmdStationLeaveUnplan(TrainEventPosition event) {
-		// TODO Auto-generated method stub
-
-		LOG.info("--aodCmdStationLeaveUnplan--start");
-		/**ATO命令信息*/
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-		
-		/**初始化ATO命令数据为默认值*/
-		cmd = initAtoCommand(cmd);
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-		//cmd.setServiceNum(task.getTablenum());
-		//cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(event.getCargroupLineNum());
-		cmd.setCargroupNum(event.getCargroupNum());
-		//cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(event.getTrainNum());
-		//cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-		
-		/**设置目的地号为终点站站台ID*/
-		cmd.setDstCode(convertDstCode2Char(event.getDstCode()));
-		cmd.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
-		
-		/** 设置默认停站时间、下一站区间运行时间*/
-		cmd.setSectionRunAdjustCmd(getDefRunTime(event.getNextStationId()));
-		/**设置默认停车站台ID*/
-		cmd.setNextStopPlatformId(event.getNextStationId());
-		
-		//1、扣车状态
-		/**当前站台有扣车，设置有扣车命令*/
-		/*cmd.setDetainCmd(getDtStatusCmd(event.getNextStationId()));
-		if(cmd.getDetainCmd() == 0x55){//有扣车，设置扣车，停站时间为默认值
-			cmd.setPlatformStopTime(0xFFFF);
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//无扣车
-			Integer stopTime = getStopTimeCmdCurr(event.getNextStationId());
-			if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-				cmd.setPlatformStopTime(stopTime);
-			}
-			else{//车站默认停站时间
-				cmd.setPlatformStopTime(getDefDwellTime(event.getNextStationId()));
-			}
-			
-		}*/
-		Integer stopTime = getStopTimeCmdCurr(event.getNextStationId());
-		if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-			cmd.setPlatformStopTime(stopTime);
-		}
-		else{//车站默认停站时间
-			cmd.setPlatformStopTime(getDefDwellTime(event.getNextStationId()));
-		}
-		
-		//2、无扣车，看跳停状态
-		//判断当前车站是否有跳停
-		String skipStatusStr = traincontrolHystrixService.getSkipStationStatus(event.getNextStationId());
-		LOG.info("[StaionSkipStatus] platformId:{} skipStatus:{}", event.getNextStationId(), skipStatusStr);
-		if(skipStatusStr != null && skipStatusStr.equals("1")){//人工设置跳停
-			cmd.setNextSkipCmd((short) 0x55);
-			cmd.setSkipPlatformId(event.getNextStationId());
-			cmd.setPlatformStopTime(0xFFFF);
-			cmd = setNextStopPlatformId(cmd, event.getNextStationId(), event.getTrainDir(), event.getDstCode());//设置下一停车站台ID
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//当前站无跳停
-			cmd.setNextSkipCmd((short) 0xAA);//设置无跳停
-		}
-		
-		LOG.info("--aodCmdStationLeaveUnplan--end");		
-		return cmd;
-	}
-
-
-	private AppDataAVAtoCommand setNextStopPlatformId(AppDataAVAtoCommand cmd, Integer platformId, short trainDir, String dstCode) {
-		AppDataAVAtoCommand atoCmd = cmd;
-		if(atoCmd.getNextSkipCmd() == 0x55  
-				&& platformId!= 0 
-				&& platformId != 9){//有跳停,则获取跳停站台后的第一个停车站台
-			String nextPlatformIdStr = traincontrolHystrixService.getNextPlatformId(trainDir, platformId);
-			DstCodeEnum dstCodeEnum = DstCodeEnum.getByDstCode(dstCode);
-			if(nextPlatformIdStr != null && !"error".equals(nextPlatformIdStr)){
-				Integer nextPlatformId = Integer.parseInt(nextPlatformIdStr);
-
-				String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
-				System.out.println("platformId:"+nextPlatformId+" skipStatus:"+skipStatusStr1);
-				//runtime += (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-				if(!(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-					atoCmd.setNextStopPlatformId(nextPlatformId);
-					cmd.setPlatformStopTime(getDefDwellTime(nextPlatformId));
-					//atoCmd.setSectionRunAdjustCmd((short) runtime);
-				}
-				else if(dstCodeEnum != null && nextPlatformId == dstCodeEnum.getPlatformId()
-						&& skipStatusStr1 != null && skipStatusStr1.equals("1")) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
-					atoCmd.setNextStopPlatformId(nextPlatformId);
-					cmd.setPlatformStopTime(getDefDwellTime(nextPlatformId));
-					//atoCmd.setSectionRunAdjustCmd((short) runtime);
-				}
-				else{
-					atoCmd = setNextStopPlatformId(atoCmd, nextPlatformId, trainDir, dstCode);
-				}
-			}
-		}
-		return atoCmd;
-	}
-	
-	/*public AppDataAVAtoCommand aodCmdReturnUnplan(TrainEventPosition event) {
-		// TODO Auto-generated method stub
-
-		LOG.info("--折返aodCmdReturnUnplan--start");
-		*//**ATO命令信息*//*
-		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
-
-		*//**初始化ATO命令数据为默认值*//*
-		cmd = initAtoCommand(cmd);//初始化ATO命令数据
-		
-		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-		//cmd.setServiceNum(task.getTablenum());
-		//cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setCargroupLineNum(event.getCargroupLineNum());
-		cmd.setCargroupNum(event.getCargroupNum());
-		//cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
-		cmd.setTrainNum(event.getTrainNum());
-		//cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
-
-		*//**设置目的地号为终点站站台ID*//*
-		//cmd.setDstCode(convertDstCode2Char(event.getDstCode()));
-		cmd.setPlanDir((short) event.getTrainDir()); // ??? need rungraph supply!
-		
-		*//** 设置默认停站时间、下一站区间运行时间*//*
-		cmd.setSectionRunAdjustCmd(getDefRunTime(event.getNextStationId()));
-		*//**设置默认停车站台ID*//*
-		cmd.setNextStopPlatformId(event.getNextStationId());
-		
-		//1、扣车状态
-		*//**当前站台有扣车，设置有扣车命令*//*
-		cmd.setDetainCmd(getDtStatusCmd(event.getNextStationId()));
-		if(cmd.getDetainCmd() == 0x55){//有扣车，设置扣车，停站时间为默认值
-			cmd.setPlatformStopTime(0xFFFF);
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//无扣车
-			Integer stopTime = getStopTimeCmdCurr(event.getNextStationId());
-			if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
-				cmd.setPlatformStopTime(stopTime);
-			}
-			else{//车站默认停站时间
-				cmd.setPlatformStopTime(getDefDwellTime(event.getNextStationId()));
-			}
-			
-		}
-		
-		//2、无扣车，看跳停状态
-		//判断当前车站是否有跳停
-		String skipStatusStr = traincontrolHystrixService.getSkipStationStatus(event.getNextStationId());
-		LOG.info("[StaionSkipStatus] platformId:{} skipStatus:{}", event.getNextStationId(), skipStatusStr);
-		if(skipStatusStr != null && skipStatusStr.equals("1")){//人工设置跳停
-			cmd.setNextSkipCmd((short) 0x55);
-			cmd.setSkipPlatformId(event.getNextStationId());
-			cmd.setPlatformStopTime(0xFFFF);
-			cmd = setNextStopPlatformId(cmd, event.getNextStationId(), event.getTrainDir());//设置下一停车站台ID
-			LOG.info("--aodCmdStationEnter--end");		
-			return cmd;
-		}
-		else{//当前站无跳停
-			cmd.setNextSkipCmd((short) 0xAA);//设置无跳停
-		}
-		
-		LOG.info("--折返轨aodCmdReturnUnplan--end");
-		return cmd;
-	}*/
-
-	/**获取当前站的默认停站时间
-	 * 
-	 * @param platformId 当前站台ID
-	 * @return 默认停站时间
-	 */
-	public int getDefDwellTime(Integer platformId){
-		String defDwellTimeStr = traincontrolHystrixService.getDefDwellTime(platformId);//获取参数管理的参数信息
-		LOG.info("[defDwellTime] platformId:{} defDwellTime:{}", platformId, defDwellTimeStr);
-		if(defDwellTimeStr != null && !defDwellTimeStr.equals("error")){//人工设置跳停
-			return Integer.parseInt(defDwellTimeStr);
-		}
-		return 0xFFFF;
-	}
-	
-	/**获取当前站的默认区间时间
-	 * 
-	 * @param platformId 当前站台ID
-	 * @return 默认区间时间
-	 */
-	public int getDefRunTime(Integer platformId){
-		String defDwellTimeStr = traincontrolHystrixService.getDefRunTime(platformId);//获取参数管理的参数信息
-		LOG.info("[defDwellTime] platformId:{} defDwellTime:{}", platformId, defDwellTimeStr);
-		if(defDwellTimeStr != null && !defDwellTimeStr.equals("error")){//人工设置跳停
-			return Integer.parseInt(defDwellTimeStr);
-		}
-		return 0xFFFF;
-	}
 	
 	/** 获取计划车下一站台停站时间*/
-	public AppDataAVAtoCommand getStaionAodCmd(TrainRunTask task, TrainEventPosition event) {
+	/*public AppDataAVAtoCommand getStaionAodCmd(TrainRunTask task, TrainEventPosition event) {
 		LOG.info("--getStaionAodCmd--start");
-		/**ATO命令信息*/
+		*//**ATO命令信息*//*
 		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 		
-		/**初始化ATO命令数据为默认值*/
+		*//**初始化ATO命令数据为默认值*//*
 		cmd = initAtoCommand(cmd);
 		
 		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
@@ -1545,19 +961,16 @@ public class RunTaskService{
 		
 		int platformId = event.getStation();
 
-		/**当前车次对应的时刻表信息*/
+		*//**当前车次对应的时刻表信息*//*
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
 
-		/**当前车次的当前站台信息*/
-		TrainRunTimetable currStation = null;
-		
-		/**当前车次的下一站台信息*/
-		TrainRunTimetable nextStation = null;
+		TrainRunTimetable currStation = null;// 当前车次的当前站台信息
+		TrainRunTimetable nextStation = null;//	当前车次的下一站台信息
 		
 		int timeStationStop = 0;	//停站时间
 		int timeSectionRun = 0;	//下一站区间运行时间
 		
-		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
+		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
 		for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
 			if (t.getPlatformId() == platformId) {
@@ -1567,18 +980,15 @@ public class RunTaskService{
 			}
 		}
 		
-		/**有当前站台、下一站台的信息*/
+		*//**有当前站台、下一站台的信息*//*
 		if(currStation != null && nextStation != null){
-			/**当前车次的终点站信息*/
-			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
+			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据，当前车次的终点站信息
 			
 			timeStationStop = (int) ((nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000); // 下一站站停时间（单位：秒）
 			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 			
-			/**设置目的地号为终点站站台ID*/
-			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
+			cmd.setDstCode(runtaskUtils.convertDstCode2Char(task.getDstStationNum()));// 设置目的地号为终点站站台ID
 			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
-			
 			cmd.setPlatformStopTime(timeStationStop);
 			cmd.setSectionRunAdjustCmd(timeSectionRun);// 区间运行等级/区间运行时间
 		}else{
@@ -1588,29 +998,20 @@ public class RunTaskService{
 		}
 			
 		LOG.info("--getStaionAodCmd--end");
-		Integer carNum = (int) event.getCargroupNum();//车组号对应的ATO命令保存
-		if (!mapAtoCmd.containsKey(carNum)) {
-			mapAtoCmd.put(carNum, cmd);
-		}
-		else {
-			mapAtoCmd.replace(carNum, cmd);
-		}
-		//mapAtoCmd.put(event.getCargroupNum(), cmd);
+		updateAtoCmd(cmd);//更新车组号对应的ATO命令
 		return cmd;
 	}
 	
-	
-	public AppDataAVAtoCommand getStaionSectionAtoCmd(TrainRunTask task, TrainEventPosition event) {
-		LOG.info("--getStaionSectionAtoCmd--start");
-		
-		/**ATO命令信息*/
+	*//** 获取计划车下一站台停站时间*//*
+	public AppDataAVAtoCommand getStaionEnterAodCmd(TrainRunTask task, TrainEventPosition event) {
+		LOG.info("--getStaionEnterAodCmd--start");
+		*//**ATO命令信息*//*
 		AppDataAVAtoCommand cmd = new AppDataAVAtoCommand();
 		
-		/**初始化ATO命令数据为默认值*/
+		*//**初始化ATO命令数据为默认值*//*
 		cmd = initAtoCommand(cmd);
 		
 		cmd.setReserved((int) event.getSrc());	//预留字段填车辆VID
-
 		cmd.setServiceNum(task.getTablenum());
 		cmd.setLineNum(task.getLineNum()); // ??? need rungraph supply!
 		cmd.setCargroupLineNum(task.getLineNum());
@@ -1618,53 +1019,136 @@ public class RunTaskService{
 		cmd.setSrcLineNum(task.getLineNum()); // ??? need rungraph supply!
 		cmd.setTrainNum(task.getTrainnum());
 		cmd.setDstLineNum(task.getLineNum()); // ??? need rungraph supply!
+		cmd.setDstCode(runtaskUtils.convertDstCode2Char(task.getDstStationNum()));// 设置目的地号为终点站站台ID
+		cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
 		
-		int nextPlatformId = event.getNextStationId();
+		int platformId = event.getStation();
 
-		/**当前车次对应的时刻表信息*/
+		*//**当前车次对应的时刻表信息*//*
 		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
-
-		/**当前车次的当前站台信息*/
-		TrainRunTimetable currStation = null;
-		
-		/**当前车次的下一站台信息*/
-		TrainRunTimetable nextStation = null;
-		
-		int timeStationStop = 0;	//停站时间
-		int timeSectionRun = 0;	//下一站区间运行时间
-		
-		/**获取当前车次时刻表的对应当前站台、下一站台的信息*/
-		for (int i = 1; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+		TrainRunTimetable currStation = null;// 当前车次的当前站台信息
+		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
+		for (int i = 0; i < timetableList.size(); i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
 			TrainRunTimetable t = timetableList.get(i);
-			if (t.getPlatformId() == nextPlatformId) {
-				nextStation = t;
-				currStation = timetableList.get(i-1);
+			if (t.getPlatformId() == platformId) {
+				currStation = t;
 				break;
 			}
 		}
 		
-		/**有当前站台、下一站台的信息*/
-		if(currStation != null && nextStation != null){
-			/**当前车次的终点站信息*/
-			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 2);//最后一条数据为车站数据
-			
-			timeStationStop = (int) ((nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000); // 下一站站停时间（单位：秒）
-			timeSectionRun = (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
-			
-			/**设置目的地号为终点站站台ID*/
-			cmd.setDstCode(convertDstCode2Char(task.getDstStationNum()));
-			cmd.setPlanDir((short) ((task.getRunDirection()==0)?0xAA:0x55)); // ??? need rungraph supply!
-			
-			cmd.setPlatformStopTime(timeStationStop);
-			cmd.setSectionRunAdjustCmd(timeSectionRun);// 区间运行等级/区间运行时间
+		*//**有当前站台、下一站台的信息*//*
+		if(currStation != null){
+			cmd.setPlatformStopTime((int) currStation.getStopTime());// 站停时间（单位：秒）
+			cmd.setSectionRunAdjustCmd((int) currStation.getRunTime());// 区间运行等级/区间运行时间（单位：秒）
+			Integer stopTime = getStopTimeCmdCurr(platformId);
+			if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+				cmd.setPlatformStopTime(stopTime);
+			}
 		}else{
-			LOG.error("[getStaionSectionAtoCmd]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
-			LOG.info("--getStaionSectionAtoCmd--end");	
+			LOG.error("[getStaionEnterAodCmd]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
+			LOG.info("--getStaionEnterAodCmd--end");	
 			return null;
 		}
 			
-		LOG.info("--getStaionSectionAtoCmd--end");
-		mapAtoCmd.put(event.getCargroupNum(), cmd);//车组号对应的ATO命令保存
+		LOG.info("--getStaionEnterAodCmd--end");
+		//updateAtoCmd(cmd);//更新车组号对应的ATO命令
 		return cmd;
 	}
+	
+	*//**
+	 *  扣车命令
+	 * @param task 运行任务
+	 * @param event 列车位置
+	 * @return ATO命令信息
+	 *//*
+	public AppDataAVAtoCommand getStationDetain(TrainRunTask task, TrainEventPosition event) {
+		LOG.info("--getStationDetain--start");
+		
+		//获取离站时发送的ATO命令
+		AppDataAVAtoCommand cmd = getStaionAodCmd(task, event);
+		if(cmd == null){
+			LOG.info("--getStationDetain--end");
+			return null;
+		}
+		
+		//判断是否有扣车
+		*//**站台有扣车，设置有扣车命令*//*
+		cmd.setDetainCmd(getDtStatusCmd(event.getStation()));
+		if(cmd.getDetainCmd() == 0x55){//有扣车,发送扣车命令
+			//cmd.setPlatformStopTime(0xFFFF);
+			return cmd;
+		}
+		else{//判断当前车站是否有跳停
+			cmd = getStationSkip(task, event);
+		}
+		
+		LOG.info("--getStationDetain--end");		
+		return cmd;
+	}
+	
+	*//**
+	 *  扣车命令
+	 * @param task 运行任务
+	 * @param event 列车位置
+	 * @return ATO命令信息
+	 *//*
+	public AppDataAVAtoCommand getStationSkip(TrainRunTask task, TrainEventPosition event) {
+		LOG.info("--getStationSkip--start");
+		//获取离站时发送的ATO命令
+		AppDataAVAtoCommand cmd = getStaionAodCmd(task, event);
+		if(cmd == null){
+			LOG.info("--getStationSkip--end");
+			return null;
+		}
+		
+		//判断当前车站是否有跳停
+		*//**当前车次对应的时刻表信息*//*
+		List<TrainRunTimetable> timetableList = task.getTrainRunTimetable();
+		TrainRunTimetable currStation = null;// 当前车次的当前站台信息
+		*//**获取当前车次时刻表的对应当前站台、下一站台的信息*//*
+		for (int i = 0; i < timetableList.size(); i++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+			TrainRunTimetable t = timetableList.get(i);
+			if (t.getPlatformId() == event.getStation()) {
+				currStation = t;
+				break;
+			}
+		}
+		
+		if(currStation != null){
+			*//** 下一站有人工设置跳停命令或者运行计划有跳停,设置跳停命令、跳停站台ID *//*
+			cmd = runtaskUtils.nextStaionSkipStatusProccess(cmd, currStation);
+			*//**(下一站有跳停)设置下一停车站台ID*//*
+			cmd = runtaskUtils.setNextStopStation(cmd, currStation, timetableList);
+			if(cmd.getNextSkipCmd() == 0x55){
+				Integer stopTime = getStopTimeCmdCurr(cmd.getNextStopPlatformId());
+				if(stopTime != null){//如果人工设置了当前站台的停站时间，则将该时间作为该站台的停站时间
+					cmd.setPlatformStopTime(stopTime);
+				}
+			}
+		}
+		else{
+			LOG.error("[getStationSkip]--this trainnum {} doesn't have plan in this station {}, so discard", event.getTrainNum(),event.getStation());
+			LOG.info("--getStationSkip--end");	
+			return null;
+		}
+		LOG.info("--getStationSkip--end");		
+		return cmd;
+	}
+	
+	*//**
+	 * 非计划车进站发送ATO命令
+	 * @param event
+	 * @return
+	 *//*
+	public AppDataAVAtoCommand getStationEnter(TrainRunTask task, TrainEventPosition event) {
+		LOG.info("--getStationEnter--start");
+		Integer platformId = event.getStation();//当前站
+		//扣车判断
+		AppDataAVAtoCommand cmd = getStationDetain(task, event);
+		if(cmd.getDetainCmd() == 0xAA){//跳停判断
+			cmd = getStationSkip(task, event);
+		}
+		LOG.info("--getStationEnter--end");
+		return cmd;
+	}*/
 }

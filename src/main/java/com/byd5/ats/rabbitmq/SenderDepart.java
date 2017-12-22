@@ -105,15 +105,20 @@ public class SenderDepart{
 			//String routeKey = AppProtocolConstant.ROUTINGKEY_VOBC_ATO_COMMAND; //"ats2cu.vobc.command";
 			String routeKey = RabbConstant.RABB_RK_AV_ATOCMD; //"ats2cu.vobc.command";
 			
-			if(appDataATOCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
+			/*if(appDataATOCommand.getNextSkipCmd() == 0x55){//若列车下一站有跳停，则连续给车发3次命令
 				template.convertAndSend(exATS2CU.getName(), routeKey, js);
 				LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
+				template.convertAndSend(exATS2CU.getName(), routeKey, js);
+				LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
+			}*/
+			
+			int index = 0;;
+			for(;index  < 5; index++){
 				template.convertAndSend(exATS2CU.getName(), routeKey, js);
 				LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
 			}
-			
-			template.convertAndSend(exATS2CU.getName(), routeKey, js);
-			LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");
+			/*template.convertAndSend(exATS2CU.getName(), routeKey, js);
+			LOG.info("[departX] " + exATS2CU.getName() + ":" + routeKey + " '" + js + "'");*/
 		}
 		
 	}
