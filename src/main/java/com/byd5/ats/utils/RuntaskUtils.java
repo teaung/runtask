@@ -12,6 +12,9 @@ import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.rabbitmq.SenderDepart;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
+import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class RuntaskUtils {
@@ -19,6 +22,8 @@ public class RuntaskUtils {
 
 	@Autowired
 	private TraincontrolHystrixService traincontrolHystrixService;
+	@Autowired
+	private TrainrungraphHystrixService trainrungraphHystrixService;
 	
 	/**
 	 * 设置目的地号: 类型转换String->char[]
@@ -78,7 +83,7 @@ public class RuntaskUtils {
 	}
 	
 	/**
-	 * (若下一站有跳停)设置下一停车站台ID、区间运行时间
+	 * (若下一站有跳停)设置下一停车站台ID、停站时间
 	 * @param cmd ATO命令信息
 	 * @param currStation 当前站台信息
 	 * @param timetableList 车次时刻表
@@ -92,24 +97,28 @@ public class RuntaskUtils {
 			int nextPlatformId = currStation.getNextPlatformId();
 			int runtime = 0; //区间运行时间
 			long stoptime = 0;//停站时间
-			for (int i = 1; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
+//			for (int i = 1; i < timetableList.size()-1; i ++) {//获取下一停车站台ID
+			for (int i = 1; i < timetableList.size(); i ++) {//获取下一停车站台ID
 				TrainRunTimetable nextStation = timetableList.get(i);
 				if (nextStation.getPlatformId() == nextPlatformId){
 					String skipStatusStr1 = traincontrolHystrixService.getSkipStationStatus(nextPlatformId);
 					System.out.println("platformId:"+nextPlatformId+" skipStatus:"+skipStatusStr1);
-					runtime += (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
+					if(skipStatusStr1 != null && skipStatusStr1.equals("error")){
+						return null;
+					}
+					//runtime += (int) ((nextStation.getPlanArriveTime() - currStation.getPlanLeaveTime())/1000); // 区间运行时间（单位：秒）
 					if(!nextStation.isSkip() && !(skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
 						atoCmd.setNextStopPlatformId(nextStation.getPlatformId());
 						//atoCmd.setSectionRunAdjustCmd((short) runtime);
-						stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
-						atoCmd.setPlatformStopTime((int) stoptime);
+						//stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
+						atoCmd.setPlatformStopTime((int) nextStation.getStopTime());
 						break;
 					}
 					if(nextPlatformId == 6 && (nextStation.isSkip() || skipStatusStr1 != null && skipStatusStr1.equals("1"))) {//当前站台不是终点站，下一站没有跳停，则为该下一停车站台ID,否则为无效值
 						atoCmd.setNextStopPlatformId(nextStation.getPlatformId());
 						//atoCmd.setSectionRunAdjustCmd((short) runtime);
-						stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
-						atoCmd.setPlatformStopTime((int) stoptime);
+						//stoptime = (nextStation.getPlanLeaveTime() - nextStation.getPlanArriveTime())/1000;
+						atoCmd.setPlatformStopTime((int) nextStation.getStopTime());
 						break;
 					}
 					nextPlatformId = nextStation.getNextPlatformId();
@@ -121,9 +130,10 @@ public class RuntaskUtils {
 	}
 	
 	/**
-	 * 下一站跳停状态处理： 设置跳停命令、下一跳停站台ID，应满足以下条件：
+	 * 下一站跳停状态处理： 设置跳停命令、跳停站台ID，应满足以下条件：
 	 * 		1、有人工设置跳停命令
 	 * 		2、或者运行计划有跳停
+	 * 无跳停：设置无跳停命令、下一停车站台ID
 	 * @param cmd ATO命令信息
 	 * @param nextStation 下一站台信息
 	 * @return ATO命令信息
@@ -160,7 +170,7 @@ public class RuntaskUtils {
 				&& platformId!= 0 
 				&& platformId != 9){//有跳停,则获取跳停站台后的第一个停车站台
 			String nextPlatformIdStr = traincontrolHystrixService.getNextPlatformId(trainDir, platformId);
-			DstCodeEnum dstCodeEnum = DstCodeEnum.getByDstCode(dstCode);
+			//DstCodeEnum dstCodeEnum = DstCodeEnum.getByDstCode(dstCode);
 			if(nextPlatformIdStr != null && nextPlatformIdStr.equals("error")){
 				return null;
 			}
@@ -202,17 +212,37 @@ public class RuntaskUtils {
 	public TrainRunTask calculateTime(TrainRunTask runtask){
 		List<TrainRunTimetable> timetableList = runtask.getTrainRunTimetable();
 		if(timetableList != null && timetableList.size() > 0){
-			for (int i = 0; i < timetableList.size()-1; i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+			for (int i = 1; i < timetableList.size(); i ++) {//时刻表第一天跟最一条数据为折返轨数据，应忽略，只关注车站数据
+				TrainRunTimetable prevStation = timetableList.get(i-1);
 				TrainRunTimetable thisStation = timetableList.get(i);
-				TrainRunTimetable nextStation = timetableList.get(i+1);
+				//TrainRunTimetable nextStation = timetableList.get(i+1);
 				thisStation.setStopTime((thisStation.getPlanLeaveTime() - thisStation.getPlanArriveTime())/1000);//当前站停站时间
-				thisStation.setRunTime((nextStation.getPlanArriveTime() - thisStation.getPlanLeaveTime())/1000);//当前站区间运行时间
+				//thisStation.setRunTime((nextStation.getPlanArriveTime() - thisStation.getPlanLeaveTime())/1000);//当前站区间运行时间
+				thisStation.setRunTime((thisStation.getPlanArriveTime() - prevStation.getPlanLeaveTime())/1000);
 				runtask.getTrainRunTimetable().set(i, thisStation);
 			}
-/*			TrainRunTimetable firstStation = timetableList.get(0);
-			firstStation.setStopTime((firstStation.getPlanLeaveTime() - firstStation.getPlanArriveTime())/1000);//当前站停站时间
-			runtask.getTrainRunTimetable().set(0, firstStation);
-*/		}
+			TrainRunTimetable lastStation = timetableList.get(timetableList.size() - 1);
+			int stoptime = 30;//默认停站时间
+			String resultMsg = trainrungraphHystrixService.getNextRuntask(runtask.getTraingroupnum(), runtask.getTablenum(), 
+					runtask.getTrainnum(), lastStation.getPlatformId());
+			if(resultMsg != null && !resultMsg.equals("error")){
+				try{
+					ObjectMapper objMapper = new ObjectMapper();
+					objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+					TrainRunTask newtask = objMapper.readValue(resultMsg, TrainRunTask.class); // json转换成map
+					TrainRunTimetable firstStation = newtask.getTrainRunTimetable().get(0);
+					stoptime = (int) ((firstStation.getPlanLeaveTime() - lastStation.getPlanArriveTime())/1000);
+				}catch (Exception e) {
+					LOG.error("[calculateTime] runtask parse error!");
+					e.printStackTrace();
+				}
+			}
+			else{
+				LOG.error("获取下一运行任务失败，不存在");
+			}
+			lastStation.setStopTime(stoptime);//当前站停站时间
+			runtask.getTrainRunTimetable().set(timetableList.size()-1, lastStation);
+		}
 		return runtask;
 	}
 }

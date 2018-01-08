@@ -27,6 +27,7 @@ import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.utils.MyExceptionUtil;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -65,18 +66,18 @@ public class ReceiverRungraph {
 			Integer carNum = task.getTraingroupnum();
 			runTaskHandler.updateMapRuntask(carNum, task);
 			
-			// 检查该车是否有记录----2017-11-08
+			/*// 检查该车是否有记录----2017-11-08
 			TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
 			if(event != null){
 			// 向该车发送表号、车次号
 				AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdReturn(event, task);
 			
 			sender.sendATOCommand(appDataATOCommand);
-			}
+			}*/
 		}catch (Exception e) {
 			// TODO: handle exception
-			e.printStackTrace();
 			LOG.error("[rungraph runtask] parse data error!");
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		
 		
@@ -145,16 +146,16 @@ public class ReceiverRungraph {
 				runTaskHandler.updateMapRuntask(task.getTraingroupnum(), task);
 				
 				// 向该车发送表号、车次号
-				TrainRunInfo trainRunInfo = new TrainRunInfo();
+				/*TrainRunInfo trainRunInfo = new TrainRunInfo();
 				BeanUtils.copyProperties(task, trainRunInfo);
 				
 				Integer carNum = trainRunInfo.getTraingroupnum();
 				// 检查该车是否有记录----2017-11-08
 				TrainEventPosition event = runTaskHandler.getMapTrace(carNum);
-				if(event != null){
-				AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
-				sender.sendATOCommand(appDataATOCommand);
-				}
+				if (event != null) {
+					AppDataAVAtoCommand appDataATOCommand = runTaskHandler.aodCmdTransform(event, trainRunInfo);
+					sender.sendATOCommand(appDataATOCommand);
+				}*/
 			}
 			
 		}catch (Exception e) {

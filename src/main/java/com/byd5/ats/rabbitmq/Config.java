@@ -149,6 +149,10 @@ public class Config{
 			return new AnonymousQueue();
 		}
 		@Bean
+		public Queue queueTraceTransformLeave() {
+			return new AnonymousQueue();
+		}
+		@Bean
 		public Queue queueTraceStationLeave() {
 			return new AnonymousQueue();
 		}
@@ -182,6 +186,11 @@ public class Config{
 		public Binding bindingTraceTransformArrive(@Qualifier("exchangeTrace") TopicExchange ex,Queue queueTraceTransformArrive) {
 			return BindingBuilder.bind(queueTraceTransformArrive).to(ex).with(RuntaskConstant.RABB_RK_TRACE_ARRIVE_TRANSFORM);
 		}	
+		//离开转换轨
+		@Bean
+		public Binding bindingTraceTransformLeave(@Qualifier("exchangeTrace") TopicExchange ex, Queue queueTraceTransformLeave) {
+			return BindingBuilder.bind(queueTraceTransformLeave).to(ex).with(RuntaskConstant.RABB_RK_TRACE_LEAVE_TRANSFORM);
+		}
 		
 		@Bean
 		public ReceiverTrace receiverTrace() {
@@ -198,14 +207,14 @@ public class Config{
 			return BindingBuilder.bind(queueDepart).to(ex).with("ats.traindepart.*");
 		}
 		
-		@Bean
+		/*@Bean
 		public Queue queueATOStatus() {
 			return new AnonymousQueue();
 		}
 		@Bean
 		public Binding bindingATOStatus(@Qualifier("topicCU2ATS") TopicExchange ex, Queue queueATOStatus) {
 			return BindingBuilder.bind(queueATOStatus).to(ex).with(RabbConstant.RABB_RK_VA_ATO_STATUS); //"cu2ats.vobc.ato.status"
-		}
+		}*/
 	}
 
 	//@Profile("sender")

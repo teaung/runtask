@@ -59,17 +59,17 @@ public class TestController{
 		event.setCargroupNum(102);
 		event.setTimestamp(new Date().getTime());
 		event.setDstCode("AI");
-		event.setStation(3);
-		event.setNextStationId(4);
+		event.setStation(9);
+		event.setNextStationId(7);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationEnter(json);
 		log.info("处理完成：");
 		
-		Map<Integer, TrainRunTask> runtaskMap = runTaskHandler.mapRunTask;
-		TrainRunTask runtask = runtaskMap.get(102);
-		runtask = runtaskUtils.calculateTime(runtask);
-		log.info(mapper.writeValueAsString(runtask));
+//		Map<Integer, TrainRunTask> runtaskMap = runTaskHandler.mapRunTask;
+//		TrainRunTask runtask = runtaskMap.get(102);
+//		runtask = runtaskUtils.calculateTime(runtask);
+//		log.info(mapper.writeValueAsString(runtask));
 	}
 
 	/*** (计划车)列车到站（停稳）测试*/
@@ -91,14 +91,14 @@ public class TestController{
 	/*** (计划车)列车离站测试*/
 	@RequestMapping(value = "/stationLeave")
 	public void stationLeave() throws JsonParseException, JsonMappingException, IOException{
-		event.setServiceNum((short) 0);
+		event.setServiceNum((short) 1);
 		event.setTrainNum((short) 102);
 		event.setCargroupNum((short) 102);
 		event.setTimestamp(new Date().getTime());
-		event.setDstCode("");
+		event.setDstCode("ZF");
 		event.setTrainDir((short) 85);
-		event.setStation(3);
-		event.setNextStationId(4);
+		event.setStation(6);
+		event.setNextStationId(7);
 		
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationLeave(json);

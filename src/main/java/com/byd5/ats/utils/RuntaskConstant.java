@@ -70,6 +70,10 @@ public class RuntaskConstant {
 	 */
 	public final static String RABB_RK_TRACE_ARRIVE_TRANSFORM = "ats.traintrace.transform.arrive";
 	/**
+	 * 离开转换轨消息的路由key
+	 */
+	public final static String RABB_RK_TRACE_LEAVE_TRANSFORM = "ats.traintrace.transform.leave";
+	/**
 	 * 更正列车运行信息消息的路由key
 	 */
 	public final static String RABB_RK_TRACE_JUDGEATO = "ats.traintrace.judgehasATOcommad";
@@ -108,6 +112,10 @@ public class RuntaskConstant {
 	 * 获取运行图模块的运行任务
 	 */
 	public final static String HX_RUNGRAPH_TASK = "http://serv31-trainrungraph/server/getRuntask?groupnum={groupnum}&tablenum={tablenum}&trainnum={trainnum}&platformId={platformId}";
+	/**
+	 * 获取运行图模块的下一运行任务
+	 */
+	public final static String HX_RUNGRAPH_NEXTTASK = "http://serv31-trainrungraph/server/getNextRuntask?groupnum={groupnum}&tablenum={tablenum}&trainnum={trainnum}&platformId={platformId}";
 	/**
 	 * 获取参数管理的参数信息
 	 */

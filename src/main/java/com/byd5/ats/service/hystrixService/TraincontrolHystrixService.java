@@ -1,5 +1,8 @@
 package com.byd5.ats.service.hystrixService;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.byd5.ats.rabbitmq.SenderDepart;
 import com.byd5.ats.utils.RuntaskConstant;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 
@@ -124,13 +128,16 @@ public class TraincontrolHystrixService {
 					@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="3000")
 			})
 	public Integer getDefDwellTime(Integer platformId){
-		String defDwellTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, "116");
-		logger.info("[getDefDwellTime] platformId:{} defDwellTime:{}", platformId, defDwellTimeStr);
-		if(defDwellTimeStr != null){
+		String json = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, "116");
+		logger.info("[getDefDwellTime] defDwellTime:{}", json);
+		if(json != null){
 			try{
-				return Integer.parseInt(defDwellTimeStr);
+				ObjectMapper mapper = new ObjectMapper();
+				Map mapjson = mapper.readValue(json, Map.class); // json转换成map
+				logger.info("[getDefDwellTime] platformId:{} defDwellTime:{}", platformId, mapjson.get("tepValue"));
+				return (Integer) mapjson.get("tepValue");
+				//return Integer.parseInt(defDwellTimeStr);
 			}catch (Exception e) {
-				// TODO: handle exception
 				sender.senderAlarmEvent("ATO命令下发失败,系统停站时间参数含非法字符");
 				logger.error("[getDefDwellTime] ATO命令下发失败,系统停站时间参数含非法字符!");
 				return null;
@@ -157,11 +164,15 @@ public class TraincontrolHystrixService {
 			})
 	public Integer getDefRunTime(Integer platformId) {
 		// TODO Auto-generated method stub
-		String defRunTimeStr = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, getRunTimeStr(platformId));
-		logger.info("[getDefRunTime] platformId:{} defRunTime:{}", platformId, defRunTimeStr);
-		if(defRunTimeStr != null){
+		String json = restTemplate.getForObject(RuntaskConstant.HX_PARA_TIME, String.class, getRunTimeStr(platformId));
+		logger.info("[getDefRunTime] defRunTime:{}", json);
+		if(json != null){
 			try{
-				return Integer.parseInt(defRunTimeStr);
+				ObjectMapper mapper = new ObjectMapper();
+				Map mapjson = mapper.readValue(json, Map.class); // json转换成map
+				logger.info("[getDefRunTime] platformId:{} defRunTime:{}", platformId, mapjson.get("tepValue"));
+				return (Integer) mapjson.get("tepValue");
+				//return Integer.parseInt(defRunTimeStr);
 			}catch (Exception e) {
 				sender.senderAlarmEvent("ATO命令下发失败,系统区间运行时间参数含非法字符");
 				logger.error("[getDefRunTime] ATO命令下发失败,系统区间运行时间参数含非法字符!");

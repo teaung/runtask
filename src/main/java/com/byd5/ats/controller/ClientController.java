@@ -27,6 +27,7 @@ import com.byd5.ats.rabbitmq.SenderDepart;
 import com.byd5.ats.service.RunTaskService;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
 import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
+import com.byd5.ats.utils.MyExceptionUtil;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -182,7 +183,8 @@ public class ClientController{
 					if (task != null && event != null && event.getStation() == platformId
 							&& event.getServiceNum() != 0) {
 						//-------------------给车发AOD命令(停站时间0)----2017-11-28------------
-						appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+						//appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+						appDataATOCommand = runTaskHandler.getStationSection(task, event);
 						
 						if(appDataATOCommand == null || appDataATOCommand != null && appDataATOCommand.getDetainCmd() == 0x55){
 							result = "0";
@@ -246,7 +248,7 @@ public class ClientController{
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[getAlltrainruntask] Exception!");
-			e.printStackTrace();
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		//LOG.info("[getAlltrainruntask] sender to PIS data: "+resultMsg);
 		return resultMsg;
@@ -282,7 +284,8 @@ public class ClientController{
 						if(event.getServiceNum() != 0 && task != null && event.getServiceNum() != 0){
 //							appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 							if(event.getStation() != null){//计划车(在站台上时才下发ATO)
-								appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+//								appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+								appDataATOCommand = runTaskHandler.getStationArrive(task, event);
 							}
 							
 						}
@@ -318,7 +321,7 @@ public class ClientController{
 			// TODO: handle exception
 			LOG.error("[dtStatus] Exception!");
 			resultMsg = "1";//失败
-			e.printStackTrace();
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		LOG.info("[dtStatus] end");
 		return resultMsg;
@@ -351,7 +354,7 @@ public class ClientController{
 			// TODO: handle exception
 			LOG.error("[sendSkipCmd] Exception!");
 			resultMsg = "1";//失败
-			e.printStackTrace();
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		LOG.info("[sendSkipCmd] end");
 		return resultMsg;
@@ -366,10 +369,12 @@ public class ClientController{
 		if(event.getServiceNum() != 0 && task != null && event.getServiceNum() != 0){//计划车
 //			appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 			if(event.getStation() != null){
-				appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+//				appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
+				//appDataATOCommand = runTaskHandler.getStationArrive(task, event);
 			}
 			else{
-				appDataATOCommand = runTaskHandler.aodCmdStationLeave(task, event);
+//				appDataATOCommand = runTaskHandler.aodCmdStationLeave(task, event);
+				appDataATOCommand = runTaskHandler.getStationSection(task, event);
 			}
 		}
 		else if(event.getServiceNum() == 0){//非计划车
@@ -393,11 +398,11 @@ public class ClientController{
 		if(alltrainStatusStr != null && !alltrainStatusStr.equals("error")){
 			List<TrainEventPosition> alltrainStatus = mapper.readValue(alltrainStatusStr, new TypeReference<List<TrainEventPosition>>() {}); // json转换成map
 			for(TrainEventPosition event:alltrainStatus){
-				if((platformId.equals(event.getNextStationId()) || platformId.equals(event.getStation()))){//头码车(带目的地号)
+//				if((platformId.equals(event.getNextStationId()) || platformId.equals(event.getStation()))){//头码车(带目的地号)
 						//&& event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
 					event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
 					carList.add(event);
-				}
+//				}
 			}
 		}
 		

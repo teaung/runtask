@@ -14,6 +14,7 @@ import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunInfo;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.utils.MyExceptionUtil;
 import com.byd5.ats.utils.RuntaskUtils;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -54,33 +55,39 @@ public class ReceiverTrace {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
-		event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
-		
-		//添加列车到站信息
-		runTaskService.updateMapTrace(event);
-		
-		//获取或 更新运行图任务信息
-		TrainRunTask task = runTaskService.getMapRuntask(event);
-		
-		// 向该车发送站间运行等级
-		AppDataAVAtoCommand appDataATOCommand = null;
-		if(event.getServiceNum() != 0 && task != null){//计划车
-			appDataATOCommand = runTaskService.aodCmdStationEnter(task, event);
-		}
-		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-			appDataATOCommand = runTaskService.getStationEnterUnplan(event);
-		}
-		if(event.getServiceNum() == 0 && 
-				(event.getDstCode() == null || event.getDstCode() != null && "".equals(event.getDstCode()))){//人工车
-			short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
-			if(event.getServiceNum() == 0 && detainCmd == 0x55){
-				//appDataATOCommand = runTaskService.getStationEnterUnplan(event);
-				appDataATOCommand = runTaskService.getStationDetainUnplan(event, event.getStation());
+		try{
+			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+			
+			//添加列车到站信息
+			runTaskService.updateMapTrace(event);
+			
+			//获取或 更新运行图任务信息
+			TrainRunTask task = runTaskService.getMapRuntask(event);
+			
+			// 向该车发送站间运行等级
+			AppDataAVAtoCommand appDataATOCommand = null;
+			if(event.getServiceNum() != 0 && task != null){//计划车
+				appDataATOCommand = runTaskService.getStationEnter(task, event);
 			}
+			if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+				appDataATOCommand = runTaskService.getStationEnterUnplan(event);
+			}
+			if(event.getServiceNum() == 0 && 
+					(event.getDstCode() == null || event.getDstCode() != null && "".equals(event.getDstCode()))){//人工车
+				short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
+				if(event.getServiceNum() == 0 && detainCmd == 0x55){
+					//appDataATOCommand = runTaskService.getStationEnterUnplan(event);
+					appDataATOCommand = runTaskService.getStationDetainUnplan(event, event.getStation());
+				}
+			}
+			sender.sendATOCommand(appDataATOCommand);
+		}catch (Exception e) {
+			// TODO: handle exception
+			MyExceptionUtil.printTrace2logger(e);
+			LOG.error("[trace.station.enter] 消息处理出错!");
 		}
 		
-		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
 		LOG.info("[trace.station.enter] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
@@ -102,25 +109,32 @@ public class ReceiverTrace {
 		//例如json里有10个属性，而我们bean中只定义了2个属性，其他8个属性将被忽略。
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
-		event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
-		
-		//添加列车到站信息
-		//runTaskService.updateMapTrace(event);
-		runTaskService.removeMapTrace(event);
-		
-		//获取或 更新运行图任务信息
-		TrainRunTask task = runTaskService.getMapRuntask(event);
-		
-		// 向该车发送站间运行等级
-		AppDataAVAtoCommand appDataATOCommand = null;
-		if(event.getServiceNum() != 0 && task != null){//计划车
-			appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
+		try{
+			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+			
+			//添加列车到站信息
+			//runTaskService.updateMapTrace(event);
+			runTaskService.removeMapTrace(event);
+			
+			//获取或 更新运行图任务信息
+			TrainRunTask task = runTaskService.getMapRuntask(event);
+			
+			// 向该车发送站间运行等级
+			AppDataAVAtoCommand appDataATOCommand = null;
+			if(event.getServiceNum() != 0 && task != null){//计划车
+//				appDataATOCommand = runTaskService.aodCmdStationLeave(task, event);
+				appDataATOCommand = runTaskService.getStationLeave(task, event);
+			}
+			if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+				appDataATOCommand = runTaskService.getStationLeaveUnplan(event);
+			}
+			sender.sendATOCommand(appDataATOCommand);
+		}catch (Exception e) {
+			// TODO: handle exception
+			MyExceptionUtil.printTrace2logger(e);
+			LOG.error("[trace.station.leave] 消息处理出错!");
 		}
-		if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-			appDataATOCommand = runTaskService.getStationLeaveUnplan(event);
-		}
-		sender.sendATOCommand(appDataATOCommand);
 		watch.stop();
 		LOG.info("[trace.station.leave] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
@@ -137,32 +151,38 @@ public class ReceiverTrace {
 		ObjectMapper objMapper = new ObjectMapper();
 		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 		
-		TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
-		event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
-		
-		//添加列车到站信息
-		runTaskService.updateMapTrace(event);
-		
-		//获取或 更新运行图任务信息
-		TrainRunTask task = runTaskService.getMapRuntask(event);
-		
-		// 向客户端发送站停时间
-		AppDataStationTiming appDataStationTiming = null;
-				
-		if(event.getServiceNum() != 0 && task != null){//计划车
-			appDataStationTiming = runTaskService.appDataStationTiming(task, event);
-		}		
-		
-		if(event.getServiceNum() == 0){//非计划车
-			/**当前站台有扣车，不发发车倒计时*/
-			/*short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
-			if(detainCmd != 0x55){//有扣车
+		try{
+			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+			
+			//添加列车到站信息
+			runTaskService.updateMapTrace(event);
+			
+			//获取或 更新运行图任务信息
+			TrainRunTask task = runTaskService.getMapRuntask(event);
+			
+			// 向客户端发送站停时间
+			AppDataStationTiming appDataStationTiming = null;
+					
+			if(event.getServiceNum() != 0 && task != null){//计划车
+				appDataStationTiming = runTaskService.appDataStationTiming(task, event);
+			}		
+			
+			if(event.getServiceNum() == 0){//非计划车
+				/**当前站台有扣车，不发发车倒计时*/
+				/*short detainCmd = runTaskService.getDtStatusCmd(event.getStation());
+				if(detainCmd != 0x55){//有扣车
+					appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+				}*/
 				appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
-			}*/
-			appDataStationTiming = runTaskService.appDataStationTimingUnplan(event);
+			}
+			
+			sender.senderAppDataStationTiming(appDataStationTiming);//发送发车倒计时消息
+		}catch (Exception e) {
+			// TODO: handle exception
+			MyExceptionUtil.printTrace2logger(e);
+			LOG.error("[trace.station.arrive] 消息处理出错!");
 		}
-		
-		sender.senderAppDataStationTiming(appDataStationTiming);//发送发车倒计时消息
 		
 		watch.stop();
 		LOG.info("[trace.station.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
@@ -196,7 +216,8 @@ public class ReceiverTrace {
 			AppDataAVAtoCommand appDataATOCommand = null;
 			
 			if(event.getServiceNum() != 0 && task != null){//计划车
-				appDataATOCommand = runTaskService.aodCmdReturn(event, task);
+//				appDataATOCommand = runTaskService.aodCmdReturn(event, task);
+				appDataATOCommand = runTaskService.getReturnLeave(task, event);
 			}
 			if(event.getServiceNum() == 0 && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
 				appDataATOCommand = runTaskService.getStationLeaveUnplan(event);
@@ -204,8 +225,9 @@ public class ReceiverTrace {
 			sender.sendATOCommand(appDataATOCommand);
 		}catch (Exception e) {
 			// TODO: handle exception
-			e.printStackTrace();
+			//e.printStackTrace();
 			LOG.error("[trace.return.leave] 消息处理出错!");
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		
 		watch.stop();
@@ -312,12 +334,12 @@ public class ReceiverTrace {
 					appDataATOCommand.setBackDepotCmd((short) 0x55);
 					sender.sendATOCommand(appDataATOCommand);
 				}
-				else{
+				/*else{
 					TrainRunInfo trainRunInfo = new TrainRunInfo();
 					BeanUtils.copyProperties(task, trainRunInfo);
 					AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdTransform(event, trainRunInfo);
 					sender.sendATOCommand(appDataATOCommand);
-				}
+				}*/
 				
 			}
 			else if(event.getTrainDir() == 0x55){
@@ -338,15 +360,61 @@ public class ReceiverTrace {
 				sender.sendATOCommand(appDataATOCommand);
 			}
 			//--------------------
-			
 		}catch (Exception e) {
 			// TODO: handle exception
-			e.printStackTrace();
 			LOG.error("[trace.transform.arrive] 消息处理出错!");
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		
 		watch.stop();
 		LOG.info("[trace.transform.arrive] Done in " + watch.getTotalTimeSeconds() + "s");
+	}
+	
+	/**
+	 * 到达转换轨时，保存列车位置信息
+	 * @param in
+	 * @throws Exception 
+	 */
+	@RabbitListener(queues = "#{queueTraceTransformLeave.name}")
+	public void receiveTraceTransformLeave(String in) throws Exception {
+		StopWatch watch = new StopWatch();
+		watch.start();
+		LOG.info("[trace.transform.leave] '" + in + "'");
+		
+		ObjectMapper objMapper = new ObjectMapper();
+		objMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		
+		try{
+			TrainEventPosition event = objMapper.readValue(in, TrainEventPosition.class);
+			event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+			
+			//添加列车到站信息
+			runTaskService.updateMapTrace(event);
+			
+			if(event.getServiceNum() != 0 && event.getTrainDir() == 0xAA){//出段
+				//--------------2017-11-24-----
+				//获取或 更新运行图任务信息
+				TrainRunTask task = runTaskService.getMapRuntask(event);
+				if(task != null){
+					TrainRunInfo trainRunInfo = new TrainRunInfo();
+					BeanUtils.copyProperties(task, trainRunInfo);
+//					AppDataAVAtoCommand appDataATOCommand = runTaskService.aodCmdTransform(event, trainRunInfo);
+					AppDataAVAtoCommand appDataATOCommand = runTaskService.getTransformLeave(task, event);
+					sender.sendATOCommand(appDataATOCommand);
+				
+				}
+			}
+			
+			//--------------------
+			
+		}catch (Exception e) {
+			// TODO: handle exception
+			LOG.error("[trace.transform.leave] 消息处理出错!");
+			MyExceptionUtil.printTrace2logger(e);
+		}
+		
+		watch.stop();
+		LOG.info("[trace.transform.leave] Done in " + watch.getTotalTimeSeconds() + "s");
 	}
 	
 	private Integer convertNextPlatformId(Integer nextPlatformId){
