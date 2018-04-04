@@ -1,11 +1,11 @@
 package com.byd5.ats.message;
 
 /**
- * 运行任务保存客户端设置停站时间命令的实体类
+ * 车站停站时间命令的实体类
  * @author wu.xianglan
  *
  */
-public class TrainruntaskCommandData{
+public class StationDwellTime{
 
 	private Integer id;
 	

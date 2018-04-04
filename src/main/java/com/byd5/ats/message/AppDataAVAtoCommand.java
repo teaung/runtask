@@ -243,7 +243,7 @@ c. VOBC与ATS通信正常且收到的回段提示字段非默认值时，根据A
 	
 } app_data__ats2vobc_ato_command_t;
  */
-public class AppDataAVAtoCommand1 {
+public class AppDataAVAtoCommand {
 
 	/*
 	 * 消息类型（2字节）：0x0203=ATO命令信息（ATS->VOBC）

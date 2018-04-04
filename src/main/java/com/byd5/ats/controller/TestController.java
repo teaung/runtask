@@ -3,23 +3,19 @@ package com.byd5.ats.controller;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
 import com.byd.ats.protocol.ats_vobc.AppDataAVAtoCommand;
 import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.message.TrainRunTimetable;
 import com.byd5.ats.rabbitmq.ReceiverAdjust;
 import com.byd5.ats.rabbitmq.ReceiverTrace;
-import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.service.TrainRuntaskService;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
 import com.byd5.ats.utils.RuntaskUtils;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -35,19 +31,16 @@ public class TestController{
 	private static final Logger log = LoggerFactory.getLogger(TestController.class);
 
 	private TrainEventPosition event = new TrainEventPosition();
-	
-	@Autowired
-	private TraincontrolHystrixService traincontrolHystrixService;
-	
 	private ObjectMapper mapper = new ObjectMapper(); // 转换器
-	
 
+	@Autowired
+	TraincontrolHystrixService traincontrolHystrixService;
 	@Autowired
 	ReceiverTrace ReceiverTrace;
 	@Autowired
 	ReceiverAdjust receiverAdjust;
 	@Autowired
-	private RunTaskService runTaskHandler;
+	private TrainRuntaskService trainRuntaskService;
 	@Autowired
 	RuntaskUtils runtaskUtils;
 	
@@ -65,11 +58,6 @@ public class TestController{
 		String json = mapper.writeValueAsString(event);
 		ReceiverTrace.receiveTraceStationEnter(json);
 		log.info("处理完成：");
-		
-//		Map<Integer, TrainRunTask> runtaskMap = runTaskHandler.mapRunTask;
-//		TrainRunTask runtask = runtaskMap.get(102);
-//		runtask = runtaskUtils.calculateTime(runtask);
-//		log.info(mapper.writeValueAsString(runtask));
 	}
 
 	/*** (计划车)列车到站（停稳）测试*/
@@ -220,7 +208,7 @@ public class TestController{
 		event.setStation(4);
 		event.setNextStationId(5);
 		
-		TrainRunTask task = runTaskHandler.getMapRuntask(event);
+		TrainRunTask task = runtaskUtils.getMapRuntask(event);
 		
 		int platformId = event.getStation();
 		TrainRunTimetable currStation = null;
@@ -236,8 +224,6 @@ public class TestController{
 				break;
 			}
 		}
-		//添加列车到站信息
-		runTaskHandler.updateMapTrace(event);
 				
 		String json = mapper.writeValueAsString(task);
 		receiverAdjust.receiveAdjust(json);
@@ -248,14 +234,12 @@ public class TestController{
 	 * @throws Exception */
 	@RequestMapping(value = "/getAllTrainStatus")
 	public void getAllTrainStatus(){
-		String alltrainStatus = traincontrolHystrixService.getAllTrainStatus();
-		log.info("[getAllTrainStatus] " + alltrainStatus);
+		runtaskUtils.getAllTrainStatus();
 	}
 	
 	@RequestMapping(value = "/getNextPlatformId")
 	public void getNextPlatformId(){
-		String nextPlatformId = traincontrolHystrixService.getNextPlatformId((short) 170, 7);
-		log.info("[getNextPlatformId] " + nextPlatformId);
+		traincontrolHystrixService.getNextPlatformId((short) 170, 7);
 	}
 	
 	@RequestMapping(value = "/setDetain")
@@ -269,9 +253,10 @@ public class TestController{
 		event.setDstCode(null); 
 		event.setStation(3);
 		event.setNextStationId(4);
-		List<Byte> listDtStatus = runTaskHandler.listDtStatus;//[3, 3, 1, 3, 3, 3, 3, 3]
+		List<Byte> listDtStatus = runtaskUtils.listDtStatus;//[3, 3, 1, 3, 3, 3, 3, 3]
 		listDtStatus.set(2, (byte) 1);
-		AppDataAVAtoCommand appDataATOCommand = runTaskHandler.getStationEnterUnplan(event);
+		AppDataAVAtoCommand appDataATOCommand = trainRuntaskService.getStationEnterUnplan(event);
 		System.out.println(mapper.writeValueAsString(appDataATOCommand));
+		mapper.configure(SerializationFeature.INDENT_OUTPUT, false);
 	}
 }

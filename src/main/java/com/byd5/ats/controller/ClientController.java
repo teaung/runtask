@@ -25,9 +25,11 @@ import com.byd5.ats.message.TrainEventPosition;
 import com.byd5.ats.message.TrainRunTask;
 import com.byd5.ats.rabbitmq.SenderDepart;
 import com.byd5.ats.service.RunTaskService;
+import com.byd5.ats.service.TrainRuntaskService;
 import com.byd5.ats.service.hystrixService.TraincontrolHystrixService;
 import com.byd5.ats.service.hystrixService.TrainrungraphHystrixService;
 import com.byd5.ats.utils.MyExceptionUtil;
+import com.byd5.ats.utils.RuntaskUtils;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -42,13 +44,11 @@ public class ClientController{
 	private static final Logger LOG = LoggerFactory.getLogger(ClientController.class);
 
 	@Autowired
-	private RunTaskService runTaskHandler;
+	private TrainRuntaskService trainRuntaskService;
 	@Autowired
 	private SenderDepart sender;
 	@Autowired
-	private TrainrungraphHystrixService trainrungraphHystrixService;
-	@Autowired
-	private TraincontrolHystrixService traincontrolHystrixService;
+	private RuntaskUtils runtaskUtils;
 	
 	/*** 处理客户端请求 
 	 * @throws IOException 
@@ -90,26 +90,26 @@ public class ClientController{
 				Integer platform = dwellTimeCommand.getPlatformId();//站台ID
 				
 				//---------------停站时间列表为空，则查询数据库获取--------------
-				runTaskHandler.getmapDwellTime();
+				runtaskUtils.getmapDwellTime();
 				
-				if (!runTaskHandler.mapDwellTime.containsKey(platform)) {
-					runTaskHandler.mapDwellTime.put(platform, dwellTimeCommand);
+				if (!runtaskUtils.mapDwellTime.containsKey(platform)) {
+					runtaskUtils.mapDwellTime.put(platform, dwellTimeCommand);
 				}
 				else {
-					Integer id = runTaskHandler.mapDwellTime.get(platform).getId();
+					Integer id = runtaskUtils.mapDwellTime.get(platform).getId();
 					dwellTimeCommand.setId(id);
-					runTaskHandler.mapDwellTime.replace(platform, dwellTimeCommand);
+					runtaskUtils.mapDwellTime.replace(platform, dwellTimeCommand);
 				}
 				
 				//----------------更新数据库停站时间命令，并更新map列表------------------
-				String resultMsg = trainrungraphHystrixService.saveRuntaskCommand(mapper.writeValueAsString(dwellTimeCommand));
+				String resultMsg = runtaskUtils.saveRuntaskCommand(mapper.writeValueAsString(dwellTimeCommand));
 				if(resultMsg == null || resultMsg.equals("error")){
 					LOG.error("[setDwellTime] save error Or parse error." );
 					BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, false, "设置失败，", platform, dwellTimeCommand.getTime(), dwellTimeCommand.getSetWay());
 
 				}else if(resultMsg != null && !resultMsg.equals("error")){
 					dwellTimeCommand = mapper.readValue(resultMsg, AppDataDwellTimeCommand.class);
-					runTaskHandler.mapDwellTime.replace(platform, dwellTimeCommand);
+					runtaskUtils.mapDwellTime.replace(platform, dwellTimeCommand);
 					BackDwellTime2AppData = new BackDwellTime2AppData(runtaskCmdType, true, "设置成功", platform, dwellTimeCommand.getTime(), dwellTimeCommand.getSetWay());
 					
 				}
@@ -142,9 +142,9 @@ public class ClientController{
 		List<DwellTimeData> dwellTimeDataList = new ArrayList<DwellTimeData>();
 		
 		//---------------停站时间列表为空，则查询数据库获取--------------
-		runTaskHandler.getmapDwellTime();
+		runtaskUtils.getmapDwellTime();
 
-		for(AppDataDwellTimeCommand dwellTimeCommand:runTaskHandler.mapDwellTime.values()){
+		for(AppDataDwellTimeCommand dwellTimeCommand:runtaskUtils.mapDwellTime.values()){
 			DwellTimeData dwellTimeData = new DwellTimeData();
 			BeanUtils.copyProperties(dwellTimeCommand, dwellTimeData);
 			dwellTimeDataList.add(dwellTimeData);
@@ -173,7 +173,7 @@ public class ClientController{
 					TrainRunTask task = null;
 					
 					if(event != null && event.getServiceNum() != 0){
-						task = runTaskHandler.getMapRuntask(event);	
+						task = runtaskUtils.getMapRuntask(event);	
 					}
 					
 					// 向该车发送站间运行等级
@@ -184,14 +184,14 @@ public class ClientController{
 							&& event.getServiceNum() != 0) {
 						//-------------------给车发AOD命令(停站时间0)----2017-11-28------------
 						//appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
-						appDataATOCommand = runTaskHandler.getStationSection(task, event);
+						appDataATOCommand = trainRuntaskService.getStationSection(task, event);
 						
 						if(appDataATOCommand == null || appDataATOCommand != null && appDataATOCommand.getDetainCmd() == 0x55){
 							result = "0";
 							return result;
 						}
 						//-------------------给客户端发停站时间0----------------
-						appDataStationTiming = runTaskHandler.appDataStationTiming(task, event);
+						appDataStationTiming = trainRuntaskService.appDataStationTiming(task, event);
 						
 						appDataATOCommand.setPlatformStopTime(0x0001);//停站时间设为0，即立即发车
 						appDataStationTiming.setTime(0x0000);
@@ -204,7 +204,7 @@ public class ClientController{
 						//LOG.info("[appDataDepartCommand] not find the car (" + carNum + ") in runTask list, so do nothing.");
 						LOG.info("[setDepartCmd] -------------unplanTrain-----------");
 						//---------------20171212----给车发AOD命令(停站时间0)----------------
-						appDataATOCommand = runTaskHandler.getStationArriveUnplan(event);//非计划车
+						appDataATOCommand = trainRuntaskService.getStationArriveUnplan(event);//非计划车
 						if(appDataATOCommand == null || appDataATOCommand != null && appDataATOCommand.getDetainCmd() == 0x55){//有扣车，不能下发立即发车，并发告警
 							sender.senderAlarmEvent("当前不满足执行立即发车的条件");
 							result = "0";
@@ -214,7 +214,7 @@ public class ClientController{
 						sender.sendATOCommand(appDataATOCommand);
 						
 						//-------------------给客户端发停站时间0----------------
-						appDataStationTiming = runTaskHandler.appDataStationTimingUnplan(event);
+						appDataStationTiming = trainRuntaskService.appDataStationTimingUnplan(event);
 						appDataStationTiming.setTime(0x0000);
 						sender.senderAppDataStationTiming(appDataStationTiming);
 						
@@ -239,7 +239,7 @@ public class ClientController{
 		try{
 			List<TrainRunTask> json = new ArrayList<TrainRunTask>();
 			ObjectMapper mapper = new ObjectMapper();
-			Map<Integer, TrainRunTask> allRuntask = runTaskHandler.mapRunTask;
+			Map<Integer, TrainRunTask> allRuntask = runtaskUtils.mapRunTask;
 			for(TrainRunTask TrainRunTask:allRuntask.values()){
 				json.add(TrainRunTask);
 			}
@@ -268,7 +268,7 @@ public class ClientController{
 			ObjectMapper mapper = new ObjectMapper();
 			List<Byte> dtStatus = mapper.readValue(dtStatusStr, new TypeReference<List<Byte>>() {}); // json转换成map
 			LOG.info("[dtStatus] dtStatus: " + dtStatus);
-			List<Byte> listDtStatus = runTaskHandler.listDtStatus;
+			List<Byte> listDtStatus = runtaskUtils.listDtStatus;
 			//Map<Integer, TrainEventPosition> mapTrace = runTaskHandler.mapTrace;
 			for(int i=-0; i<dtStatus.size(); i++){
 				if(dtStatus.get(i) != listDtStatus.get(i)){//扣车状态有改变
@@ -277,7 +277,7 @@ public class ClientController{
 					List<TrainEventPosition> carList = getAllTrainStatus(platformId);
 					for(TrainEventPosition event:carList){
 						//获取或 更新运行图任务信息
-						TrainRunTask task = runTaskHandler.getMapRuntask(event);
+						TrainRunTask task = runtaskUtils.getMapRuntask(event);
 						
 						// 向该车发送站间运行等级
 						AppDataAVAtoCommand appDataATOCommand = null;
@@ -285,19 +285,19 @@ public class ClientController{
 //							appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
 							if(event.getStation() != null){//计划车(在站台上时才下发ATO)
 //								appDataATOCommand = runTaskHandler.aodCmdStationEnter(task, event);
-								appDataATOCommand = runTaskHandler.getStationArrive(task, event);
+								appDataATOCommand = trainRuntaskService.getStationArrive(task, event);
 							}
 							
 						}
 						else if(event.getServiceNum() == 0){//非计划车
 							//-------------------给车发扣车AOD命令----------------
 							if(event.getStation() != null && event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车
-								appDataATOCommand = runTaskHandler.getStationArriveUnplan(event);
+								appDataATOCommand = trainRuntaskService.getStationArriveUnplan(event);
 //								appDataATOCommand = runTaskHandler.getStationDetainUnplan(event, event.getStation());
 							}
 							else if(event.getStation() != null && 
 									(event.getDstCode() == null || event.getDstCode() != null && "".equals(event.getDstCode()))){//人工车
-								appDataATOCommand = runTaskHandler.getStationDetainUnplan(event, event.getStation());
+								appDataATOCommand = trainRuntaskService.getStationDetainUnplan(event, event.getStation());
 							}
 						}
 						sender.sendATOCommand(appDataATOCommand);
@@ -328,7 +328,7 @@ public class ClientController{
 	}
 	
 	/**
-	 * 更新车站扣车状态信息，给车发扣车命令
+	 * 设置取消跳停，给车发跳停命令
 	 * @return
 	 * @throws JsonParseException
 	 * @throws JsonMappingException
@@ -362,7 +362,7 @@ public class ClientController{
 
 	private void sendSkipCmd2vobc(TrainEventPosition event) throws JsonProcessingException {
 		//获取或 更新运行图任务信息
-		TrainRunTask task = runTaskHandler.getMapRuntask(event);
+		TrainRunTask task = runtaskUtils.getMapRuntask(event);
 		
 		// 向该车发送站间运行等级
 		AppDataAVAtoCommand appDataATOCommand = null;
@@ -374,7 +374,7 @@ public class ClientController{
 			}
 			else{
 //				appDataATOCommand = runTaskHandler.aodCmdStationLeave(task, event);
-				appDataATOCommand = runTaskHandler.getStationSection(task, event);
+				appDataATOCommand = trainRuntaskService.getStationSection(task, event);
 			}
 		}
 		else if(event.getServiceNum() == 0){//非计划车
@@ -383,7 +383,7 @@ public class ClientController{
 //				appDataATOCommand = runTaskHandler.getStationSkipUnplan(event, event.getStation());
 			}
 			else{
-				appDataATOCommand = runTaskHandler.getStationSectionUnplan(event);
+				appDataATOCommand = trainRuntaskService.getStationSectionUnplan(event);
 //				appDataATOCommand = runTaskHandler.getStationSkipUnplan(event, event.getNextStationId());
 			}
 		}
@@ -392,18 +392,14 @@ public class ClientController{
 	}
 	
 	public List<TrainEventPosition> getAllTrainStatus(Integer platformId) throws JsonParseException, JsonMappingException, IOException{
-		ObjectMapper mapper = new ObjectMapper();
 		List<TrainEventPosition> carList = new ArrayList<TrainEventPosition>();
-		String alltrainStatusStr = traincontrolHystrixService.getAllTrainStatus();
-		if(alltrainStatusStr != null && !alltrainStatusStr.equals("error")){
-			List<TrainEventPosition> alltrainStatus = mapper.readValue(alltrainStatusStr, new TypeReference<List<TrainEventPosition>>() {}); // json转换成map
-			for(TrainEventPosition event:alltrainStatus){
-//				if((platformId.equals(event.getNextStationId()) || platformId.equals(event.getStation()))){//头码车(带目的地号)
-						//&& event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
-					event.setNextStationId(convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
-					carList.add(event);
-//				}
-			}
+		List<TrainEventPosition> alltrainStatus = runtaskUtils.getAllTrainStatus();
+		for(TrainEventPosition event:alltrainStatus){
+//			if((platformId.equals(event.getNextStationId()) || platformId.equals(event.getStation()))){//头码车(带目的地号)
+					//&& event.getDstCode() != null && !"".equals(event.getDstCode())){//头码车(带目的地号)
+				event.setNextStationId(runtaskUtils.convertNextPlatformId(event.getNextStationId()));//转换下一站台ID
+				carList.add(event);
+//			}
 		}
 		
 		LOG.info("[getAllTrainStatus] " + carList);
@@ -419,25 +415,15 @@ public class ClientController{
 			event.setCargroupNum((short) 103);
 			event.setServiceNum((short) 1);
 			event.setTrainNum((short) 102);
-			TrainRunTask newtask = runTaskHandler.getNewRuntask(event);
+			TrainRunTask newtask = runtaskUtils.getNewRuntask(event);
 			resultMsg = mapper.writeValueAsString(newtask);
 			
 		}catch (Exception e) {
 			// TODO: handle exception
 			LOG.error("[getRuntask] runtask parse error!");
-			e.printStackTrace();
+			MyExceptionUtil.printTrace2logger(e);
 		}
 		return resultMsg;
 	}
 	
-	private Integer convertNextPlatformId(Integer nextPlatformId){
-		if(nextPlatformId == 10){//下一站转换轨
-			nextPlatformId = 0;
-		}
-		
-		if(nextPlatformId == 9){//下一站折返轨
-			nextPlatformId = 9;
-		}
-		return nextPlatformId;
-	}
 }

@@ -57,11 +57,11 @@
 		</dependency>
 		
 		<!-- customized package: protocol class library for ATS to CI/ZC/VOBC -->
-		<dependency>
+		<!--<dependency>
 			<groupId>com.byd.ats</groupId>
 			<artifactId>lib01-protocol-ats2ext</artifactId>
 			<version>0.1.2</version>
-		</dependency>
+		</dependency>-->
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -123,7 +123,7 @@
 	</pluginRepositories>
 -->
 
-	<repositories>
+	<!--<repositories>
 		<repository>
 			<id>maven-local</id>
 			<name>Maven local repository</name>
@@ -154,10 +154,10 @@
 				<enabled>false</enabled>
 			</snapshots>
 		</pluginRepository>
-	</pluginRepositories>
+	</pluginRepositories>-->
 
 	<!-- upload the component to maven local repository when run mvn depoly -->
-	<distributionManagement>
+	<!--<distributionManagement>
 		<repository>
 			<id>maven-local-releases</id>
 			<name>Maven Local Release Repository</name>
@@ -168,6 +168,6 @@
 			<name>Maven Local Snapshot Repository</name>
 			<url>http://10.5.133.220:8081/repository/maven-snapshots/</url>
 		</snapshotRepository>
-	</distributionManagement>
+	</distributionManagement>-->
 
 </project>
